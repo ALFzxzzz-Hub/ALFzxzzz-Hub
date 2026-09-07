@@ -77,16 +77,16 @@ local function CreateToggleMenu(IconId)
     return MainButton, ScreenGui
 end
 
-CreateToggleMenu(90852108759369)
+CreateToggleMenu(92826170205694)
 
 --========================================================--
 -- WINDOW
 --========================================================--
 
 local Window = Library:CreateWindow({
-    Title = "Purple X Hub",
-    Footer = "Violence District - ALFzxzzz Hub",
-    Icon = 90852108759369,
+    Title = "ALFzxzzz X Hub",
+    Footer = "Violence District - ALFzxzzz Hub - Freemium",
+    Icon = 92826170205694,
     IconSize = UDim2.fromOffset(40, 40),
     CornerRadius = 7,
     NotifySide = "Right",
