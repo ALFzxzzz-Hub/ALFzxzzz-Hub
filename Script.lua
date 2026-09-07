@@ -33,7 +33,7 @@ if not ModernV2 then
         warn("[ALFzxzzzHub] Vercel mirror failed, trying GitHub fallback:", loaderResult)
         -- Fallback: GitHub raw (may be rate-limited)
         local fallbackOk, fallbackResult = pcall(function()
-            local source = game:HttpGet("https://raw.githubusercontent.com/Kys-lol/KysHubNewUI/refs/heads/main/MainV2.lua")
+            local source = game:HttpGet("https://raw.githubusercontent.comKys-lol/KysHubNewUI/refs/heads/main/MainV2.lua")
             local fn, compileErr = loadstring(source)
             if not fn then error(compileErr) end
             return fn()
@@ -74,7 +74,7 @@ if ModernV2 then
         ModernV2:AddTheme({
             Name = "Lumi Blue",
             Accent = Color3.fromRGB(158, 158, 158),
-            Outline = Color3.fromRGB(204, 204, 204),
+            Outline = Color3.fromRGB(255, 255, 255),
             Text = Color3.fromRGB(255, 255, 255),
             PlaceholderText = Color3.fromRGB(200, 200, 200)
         })
@@ -84,11 +84,11 @@ end
 local MenuIcon
 if ModernV2 and ModernV2.CreateMenuIcon then
     MenuIcon = ModernV2:CreateMenuIcon({
-        Image = "rbxassetid://90852108759369",
+        Image = "rbxassetid://92826170205694",
         Size = 48,
         IconColor = Color3.fromRGB(255, 255, 255),
-        BGColor = Color3.fromRGB(20, 22, 27),
-        StrokeColor = Color3.fromRGB(158, 158, 158),
+        BGColor = Color3.fromRGB(0, 0, 0),
+        StrokeColor = Color3.fromRGB(205, 205, 205),
         StrokeThick = 1.5,
         Draggable = true,
     })
@@ -102,9 +102,9 @@ if ModernV2 then
         Title = "ALFzxzzz Hub",
         Content = "Violence District v0.1.1",
         Uitransparent = 0.15,
-        Size = UDim2.fromOffset(500, 320),
+        Size = UDim2.fromOffset(540, 360),
         Color = Color3.fromRGB(204, 204, 204),
-        Image = "90852108759369",
+        Image = "92826170205694",
         ShowUser = true,
         Search = true,
         ConfigEnabled = true,
@@ -166,6 +166,10 @@ if ModernV2 then
             {
                 Title = "ALFzxzzz Hub v0.1.1",
                 Description = "Added Dash Lock feature for Killer with auto-target and smooth camera tracking.",
+            },
+            {
+                Title = "ALFzxzzz Hub v0.1.1",
+                Description = "Added Teleport Forward feature with floating button and distance slider.",
             },
         },
         UIChangelog = {
@@ -290,6 +294,8 @@ getgenv().VD = getgenv().VD or {
     MoonwalkButtonLocked  = false,
     MoonwalkZigzagSpeed   = 11,
     MoonwalkBoostPower    = 1.08,
+    SelfHealButtonVisible = false,
+    SelfHealButton_DragLocked = false,
     AimLock               = false,
     AimLockButton         = false,
     AimLockButtonLocked   = false,
@@ -322,7 +328,7 @@ getgenv().VD = getgenv().VD or {
     SURV_FleeKiller       = false,
     SURV_FleeDistance     = 40,
     SURV_SwiftVault        = false,  -- Auto Vault saat dekat window
-    SURV_SwiftVaultV2       = false,  -- Custom vault speed
+    SURF_SwiftVaultV2       = false,  -- Custom vault speed
     SURV_SwiftVaultSpeed       = 13,
     SURV_AutoPallet       = false,  -- Auto Pallet Drop saat killer dekat
     SURV_AutoPalletDist   = 20,     -- Jarak killer (studs) untuk trigger pallet drop
@@ -366,6 +372,7 @@ getgenv().VD = getgenv().VD or {
     BEAT_Survivor         = false,
     BEAT_Killer           = false,
     TP_Offset             = 3,
+    -- Next Killer Display
     VIS_ALFzxzzzKiller        = false,
     VIS_SpectatorCounter  = false,
     VIS_KillerPerks       = false,
@@ -423,6 +430,11 @@ getgenv().VD = getgenv().VD or {
     _DashLockActive       = false,
     _DashLockTarget       = nil,
     _DashLockConnection   = nil,
+    
+    -- TELEPORT FORWARD FEATURE
+    TeleportForward_Enabled = false,
+    TeleportForward_Distance = 50,
+    TeleportForward_DragLocked = false,
 }
 
 local VD = getgenv().VD
@@ -632,11 +644,13 @@ local VD_DefaultOffFlags = {
     "SURV_WarnKiller",
     "DashLockEnabled",
     "FreezeDuringDashLock",
+    "TeleportForward_Enabled",
 }
 
 for _, flagName in ipairs(VD_DefaultOffFlags) do
     VD[flagName] = false
 end
+VD.SelfHealButtonVisible = false
 
 if VD.TOF_Laser == nil then VD.TOF_Laser = true end
 if VD.TOF_WallCheck == nil then VD.TOF_WallCheck = false end
@@ -734,9 +748,9 @@ local VD_To_Flag = {
     SURV_VaultSpeed     = "SwiftVaultSpeed",
     SURV_AutoPallet     = "Pallet Reflex",
     SURV_AutoPalletDist = "Pallet Trigger Range",
-    SURV_AutoParry      = "Auto Parry",
-    SURV_ParryDistance  = "Parry Distance Trigger",
-    SURV_ShowParryCircle = "Show Parry Range Circle",
+    SURV_AutoParry      = "Auto Parry V1",
+    SURV_ParryDistance  = "Parry V1 Range",
+    SURV_ShowParryCircle = "Show Parry V1 Range",
     SURV_FakeParry      = "Fake Parry (Press V)",
     SURV_FakeParryAnim  = "Fake Parry Animation",
     SURV_FakeGen        = "Fake Generator (Press B)",
@@ -761,6 +775,8 @@ local VD_To_Flag = {
     MoonwalkButtonLocked = "Lock Moonwalk Button",
     MoonwalkZigzagSpeed = "Moonwalk Zigzag Speed",
     MoonwalkBoostPower = "Moonwalk Boost Power",
+    SelfHealButtonVisible = "Show Self Heal Button",
+    SelfHealButton_DragLocked = "Lock Self Heal Button Position",
     AimLock = "Target Lock",
     AimLockButton = "Target Lock",
     AimLockButtonLocked = "Lock Target Lock Button",
@@ -808,7 +824,7 @@ local VD_To_Flag = {
     AUTO_Attack = "Auto Attack",
     BEAT_Survivor = "Beat Survivor (auto exit)",
     SURV_WarnKiller = "Survivor Killer Warning",
-    VIS_ALFzxzzzKiller = "ALFzxzzz Killer Display",
+    VIS_NextKiller = "Next Killer Display",
     VIS_SpectatorCounter = "Enable Spectator Counter",
     VIS_KillerPerks = "Killer Perks Display",
     VIS_PredictMap = "Predict Map",
@@ -819,6 +835,9 @@ local VD_To_Flag = {
     DashLockDuration = "Dash Lock Duration",
     DashLockSmoothness = "Dash Lock Smoothness",
     FreezeDuringDashLock = "Freeze During Dash Lock",
+    TeleportForward_Enabled = "Teleport Forward",
+    TeleportForward_Distance = "Teleport Distance",
+    TeleportForward_DragLocked = "Lock Teleport Button",
 }
 
 function MAWWW_LoadConfig(name)
@@ -1387,9 +1406,9 @@ do
     local MAWWW_ESPState = {
         PlayerMasterESP = false,
         WorldMasterESP = false,
-        ESPFillTransparency = 0.95,
+        ESPFillTransparency = 0.85,
         ESPOutlineTransparency = 0.3,
-        ESPTextSize = 12,
+        ESPTextSize = 8,
 
         SurvivorESP = false,
         KillerESP = false,
@@ -1398,7 +1417,7 @@ do
         DistanceESP = false,
         SurvivorItemsESP = false,
 
-        SurvivorColor = Color3.fromRGB(255, 255, 255),
+        SurvivorColor = Color3.fromRGB(0, 255, 255),
         KillerColor = Color3.fromRGB(255, 0, 0),
         SpectatorColor = Color3.fromRGB(255, 255, 255),
 
@@ -2896,7 +2915,7 @@ local function MAWWW_ToFUpdateLaser(originPos, targetPos)
         laser.CanTouch = false
         laser.CastShadow = false
         laser.Material = Enum.Material.Neon
-        laser.Color = Color3.fromRGB(128, 128, 128)
+        laser.Color = Color3.fromRGB(205, 205, 205)
         laser.Parent = workspace
         MAWWW_ToFState.LaserBeam = laser
     end
@@ -3034,7 +3053,7 @@ local function MAWWW_ToFCreateTargetSelectorUI()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
     local stroke = Instance.new("UIStroke", frame)
-    stroke.Color = Color3.fromRGB(158, 158, 158)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
     stroke.Thickness = 1
 
     local header = Instance.new("Frame")
@@ -3068,7 +3087,7 @@ local function MAWWW_ToFCreateTargetSelectorUI()
     minimizeBtn.Position = UDim2.new(1, -30, 0, 0)
     minimizeBtn.BackgroundTransparency = 1
     minimizeBtn.Text = "-"
-    minimizeBtn.TextColor3 = Color3.fromRGB(185, 190, 205)
+    minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     minimizeBtn.Font = Enum.Font.GothamBold
     minimizeBtn.TextSize = 14
     minimizeBtn.Parent = header
@@ -3078,7 +3097,7 @@ local function MAWWW_ToFCreateTargetSelectorUI()
     headerLbl.Position = UDim2.new(0, 10, 0, 0)
     headerLbl.BackgroundTransparency = 1
     headerLbl.Text = "TOF TARGET MODE"
-    headerLbl.TextColor3 = Color3.fromRGB(204, 204, 204)
+    headerLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     headerLbl.Font = Enum.Font.GothamBold
     headerLbl.TextSize = 10
     headerLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -3123,7 +3142,7 @@ local function MAWWW_ToFCreateTargetSelectorUI()
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
         local btnStroke = Instance.new("UIStroke", btn)
-        btnStroke.Color = Color3.fromRGB(158, 158, 158)
+        btnStroke.Color = Color3.fromRGB(255, 255, 255)
         btnStroke.Thickness = 1
 
         btn.MouseButton1Click:Connect(function()
@@ -3298,7 +3317,7 @@ local MAWWW_HideSurvivorIconState = {
     Originals = {},
 }
 
-local MAWWW_HideSurvivorIconImage = "rbxassetid://90852108759369"
+local MAWWW_HideSurvivorIconImage = "rbxassetid://92826170205694"
 local MAWWW_HideSurvivorIconText = "ALFzxzz"
 
 local function MAWWW_GetSurvivorSlots()
@@ -3597,14 +3616,14 @@ local function MAWWW_CreatePingFPSGui()
     frame.Name = "Main"
     frame.Size = UDim2.new(0, 118, 0, 44)
     frame.Position = UDim2.new(0, 12, 0, 120)
-    frame.BackgroundColor3 = Color3.fromRGB(16, 18, 24)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     frame.BackgroundTransparency = 0.1
     frame.BorderSizePixel = 0
     frame.Parent = sg
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
     local stroke = Instance.new("UIStroke", frame)
-    stroke.Color = Color3.fromRGB(96, 72, 160)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
     stroke.Thickness = 1
 
     local label = Instance.new("TextLabel")
@@ -3614,7 +3633,7 @@ local function MAWWW_CreatePingFPSGui()
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.GothamBold
     label.TextSize = 13
-    label.TextColor3 = Color3.fromRGB(230, 235, 245)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.TextYAlignment = Enum.TextYAlignment.Center
     label.Text = "PING: --ms\nFPS: --"
@@ -3777,7 +3796,7 @@ local function MAWWW_UpdateFlashlightLaser(originPos, targetPos)
         laser.CanTouch = false
         laser.CastShadow = false
         laser.Material = Enum.Material.Neon
-        laser.Color = Color3.fromRGB(204, 204, 204)
+        laser.Color = Color3.fromRGB(255, 255, 255)
         laser.Transparency = 0
         laser.Parent = workspace
         MAWWW_FlashlightAimState.LaserBeam = laser
@@ -3909,7 +3928,7 @@ VD_ParryRange.Name = "MAWWW_ParryRange"
 VD_ParryRange.Radius = VD.SURV_ParryDistance or 8
 VD_ParryRange.InnerRadius = math.max(0.1, (VD.SURV_ParryDistance or 8) - 0.15)
 VD_ParryRange.Height = 0.01
-VD_ParryRange.Color3 = Color3.fromRGB(128, 128, 128)
+VD_ParryRange.Color3 = Color3.fromRGB(255, 255, 255)
 VD_ParryRange.AlwaysOnTop = false
 VD_ParryRange.Adornee = Workspace:FindFirstChildOfClass("Terrain")
 VD_ParryRange.Transparency = 1
@@ -4035,222 +4054,186 @@ function TriggerCrouch()
 end
 function IsSafeToParry(char) return not IsDowned(char) end
 local player = LocalPlayer
--- ==================== AUTO PARRY SENSOR ====================
-function tapMobileParryButton()
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return end
+-- AUTO PARRY V1
+--========================================================--
 
-    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
-    local parryBtn = survivorMob
-        and survivorMob:FindFirstChild("Controls")
-        and survivorMob.Controls:FindFirstChild("Gui-mob")
-
-    if parryBtn and parryBtn.Visible then
-        if firesignal then
-            pcall(function()
-                firesignal(parryBtn.MouseButton1Down)
-                task.wait(0.01)
-                firesignal(parryBtn.MouseButton1Up)
-            end)
-        end
-    else
-        pcall(function()
-            if mouse2click then
-                mouse2click()
-                return
-            end
-            if mouse2press and mouse2release then
-                mouse2press()
-                task.wait(0.01)
-                mouse2release()
-                return
-            end
-            if MouseButton2Click then
-                MouseButton2Click()
-                return
-            end
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
-            task.wait(0.01)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
-        end)
-    end
+local AutoParryV1 = { Enabled = false, ParryDistance = 15, FaceSensitivity = 0.7 }
+local ParryRangeVisual = { Enabled = false, Color = Color3.fromRGB(150, 150, 150), Transparency = 0.1 }
+local Visuals = { Circle = nil }
+local lastParry = 0
+local PARRY_DEBOUNCE = 0.2
+local KillerAnims = {
+    ["rbxassetid://105374834496520"] = true, ["rbxassetid://113255068724446"] = true, ["rbxassetid://118907603246885"] = true,
+    ["rbxassetid://129784271201071"] = true, ["rbxassetid://117042998468241"] = true, ["rbxassetid://122812055447896"] = true,
+    ["rbxassetid://78935059863801"] = true, ["rbxassetid://74968262036854"] = true, ["rbxassetid://78432063483146"] = true,
+    ["rbxassetid://132817836308238"] = true, ["rbxassetid://133963973694098"] = true, ["rbxassetid://111920872708571"] = true,
+    ["rbxassetid://80411309607666"] = true, ["rbxassetid://98163597193511"] = true, ["rbxassetid://82666958311998"] = true,
+    ["rbxassetid://110355011987939"] = true, ["rbxassetid://139369275981139"] = true, ["rbxassetid://135002183282873"] = true,
+    ["rbxassetid://121216847022485"] = true, ["rbxassetid://130593238885843"] = true, ["rbxassetid://117070354890871"] = true,
+    ["rbxassetid://106871536134254"] = true, ["rbxassetid://138720291317243"] = true
+}
+local hookedKillers = {}
+local function V1_GetRoot() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") end
+local function V1_TriggerParry()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui") if not pg then return end
+    local survivorMob = pg:FindFirstChild("Survivor-mob") if not survivorMob then return end
+    local controls = survivorMob:FindFirstChild("Controls") if not controls then return end
+    local btnMob = controls:FindFirstChild("Gui-mob") if not btnMob then return end
+    if typeof(firesignal) == "function" then pcall(function() firesignal(btnMob.MouseButton1Down) end)
+    elseif typeof(getconnections) == "function" then for _, conn in ipairs(getconnections(btnMob.MouseButton1Down)) do if conn.Function then conn.Function() end end end
 end
-
-function ExecuteParry()
-    if State.ParryCooldown then return end
-    pcall(function()
-        local parryRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"):FindFirstChild("Items"):FindFirstChild("Parrying Dagger"):FindFirstChild("parry")
-        if parryRemote then
-            for i = 1, 10 do parryRemote:FireServer() end
-        end
-        task.spawn(tapMobileParryButton)
-    end)
+local function V1_DoParry()
+    local now = tick() if now - lastParry < PARRY_DEBOUNCE then return end
+    lastParry = now V1_TriggerParry()
 end
-
-function ListenToParryResult()
-    task.spawn(function()
-        local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 5)
-        local dagger = remotes and remotes:WaitForChild("Items", 5):WaitForChild("Parrying Dagger", 5)
-        local parryResultRemote = dagger and dagger:WaitForChild("parryResult", 5)
-        
-        if parryResultRemote then
-            parryResultRemote.OnClientEvent:Connect(function(arg1, arg2)
-                local cdDur = tonumber(arg2) or ((arg1 == true) and 90 or 60)
-                State.ParryCooldown = true
-                if State.ParryCooldownThread then task.cancel(State.ParryCooldownThread) end
-                State.ParryCooldownThread = task.delay(cdDur, function()
-                    State.ParryCooldown = false
-                end)
-            end)
-        end
-    end)
+local function V1_IsInParryRange(killerChar)
+    local myRoot = V1_GetRoot() if not myRoot or not killerChar then return false end
+    local enemyRoot = killerChar:FindFirstChild("HumanoidRootPart") if not enemyRoot then return false end
+    return (enemyRoot.Position - myRoot.Position).Magnitude <= AutoParryV1.ParryDistance
 end
-ListenToParryResult()
-
-function AttachParrySensor(kChar)
-    if not kChar or Attached[kChar] then return end
-    Attached[kChar] = true
-    local humanoid = kChar:FindFirstChild("Humanoid")
-    if not humanoid then
-        humanoid = kChar:WaitForChild("Humanoid", 5)
-        if not humanoid then return end
-    end
-    local animator = humanoid:FindFirstChildOfClass("Animator")
-    if not animator then
-        animator = humanoid:WaitForChild("Animator", 5)
-        if not animator then return end
-    end
-
-    humanoid.ChildAdded:Connect(function(child)
-        if child:IsA("Animator") then
-            Attached[kChar] = nil
-            AttachParrySensor(kChar)
-        end
-    end)
-
-    kChar.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            Attached[kChar] = nil
-        end
-    end)
-
+local function V1_IsFacingTarget(targetChar)
+    if AutoParryV1.FaceSensitivity <= -1 then return true end
+    local myChar = LocalPlayer.Character if not myChar then return false end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart") local enemyRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot or not enemyRoot then return false end
+    return enemyRoot.CFrame.LookVector:Dot((myRoot.Position - enemyRoot.Position).Unit) >= AutoParryV1.FaceSensitivity
+end
+local function V1_HookKiller(char)
+    if hookedKillers[char] then return end hookedKillers[char] = true
+    local hum = char:FindFirstChildOfClass("Humanoid") if not hum then return end
+    local animator = hum:FindFirstChildOfClass("Animator") if not animator then return end
     animator.AnimationPlayed:Connect(function(track)
-        local animId = track.Animation and track.Animation.AnimationId or ""
-        local id = animId:match("%d+")
-        
-        -- Auto Crouch untuk Abyssal S1
-        if id == "80411309607666" and VD.AutoCrouch then
-            local myChar = LocalPlayer.Character
-            if IsDowned(myChar) then return end
-            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local kHRP = kChar:FindFirstChild("HumanoidRootPart")
-            if myHRP and kHRP then
-                local dist = (myHRP.Position - kHRP.Position).Magnitude
-                if dist <= 40 then
-                    TriggerCrouch()
-                end
-            end
-            return 
-        end
-        
-        local attackName = VD_ATTACK_ANIMS[animId]
-        if not attackName then return end
-        
-        if not VD.SURV_AutoParry then return end
-        if State.ParryCooldown then return end 
-        if VD.Ignored_Skills_List and VD.Ignored_Skills_List[attackName] then return end
-
-        local myChar = LocalPlayer.Character
-        if IsDowned(myChar) or not IsSafeToParry(myChar) then return end
-        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        local kHRP = kChar:FindFirstChild("HumanoidRootPart")
-        if not myHRP or not kHRP then return end
-        
-        local delta = myHRP.Position - kHRP.Position
-        local startDistance = delta.Magnitude
-
-        if VD.SURV_ParryAggressive then
-            local aggressiveRadius = 12
-            local detectionRadius = VD.SURV_ParryDistance + 5
-            if startDistance > detectionRadius then return end
-            if startDistance <= aggressiveRadius then
-                ExecuteParry()
-            else
-                local tracker
-                local startTime = os.clock()
-                tracker = RunService.Heartbeat:Connect(function()
-                    if os.clock() - startTime >= 1.5 or State.ParryCooldown or not myHRP or not kHRP or IsDowned(myChar) then
-                        if tracker then tracker:Disconnect() end
-                        return
-                    end
-                    local currentDist = (myHRP.Position - kHRP.Position).Magnitude
-                    if currentDist <= aggressiveRadius then
-                        ExecuteParry()
-                        if tracker then tracker:Disconnect() end
-                    end
-                end)
-            end
-        else
-            if startDistance > VD.SURV_ParryDistance then return end
-            local myPosFlat = Vector3.new(myHRP.Position.X, 0, myHRP.Position.Z)
-            local kPosFlat = Vector3.new(kHRP.Position.X, 0, kHRP.Position.Z)
-            local flatDelta = myPosFlat - kPosFlat
-            if flatDelta.Magnitude > 0 then
-                local flatDirection = flatDelta.Unit
-                local kLookFlat = Vector3.new(kHRP.CFrame.LookVector.X, 0, kHRP.CFrame.LookVector.Z).Unit
-                local isFacing = kLookFlat:Dot(flatDirection)
-                if isFacing < 0.6 then return end
-            end
-            ExecuteParry()
+        if not AutoParryV1.Enabled then return end
+        local anim = track.Animation if not anim then return end
+        local id = anim.AnimationId:match("%d+") if not id then return end
+        if KillerAnims["rbxassetid://" .. id] then
+            if not V1_IsInParryRange(char) then return end
+            if not V1_IsFacingTarget(char) then return end
+            V1_DoParry()
         end
     end)
 end
+local function V1_ScanKillers() for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer and p.Character and p.Team and p.Team.Name == "Killer" then V1_HookKiller(p.Character) end end end
+task.spawn(function() while true do task.wait(1) if AutoParryV1.Enabled then V1_ScanKillers() end end end)
 
-function TryAttach(p)
-    if p ~= player and IsKiller(p) and p.Character then 
-        AttachParrySensor(p.Character) 
+local function V1_CreateCircle()
+    if Visuals.Circle then Visuals.Circle:Destroy() Visuals.Circle = nil end
+    local char = LocalPlayer.Character if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart") if not root then return end
+    local folder = Instance.new("Folder") folder.Name = "ParryCircle" folder.Parent = root
+    local numSegments = 32 local radius = AutoParryV1.ParryDistance local yOffset = -3.0
+    for i = 1, numSegments do
+        local angle1 = (i - 1) / numSegments * math.pi * 2 local angle2 = i / numSegments * math.pi * 2
+        local pos1 = Vector3.new(math.cos(angle1) * radius, yOffset, math.sin(angle1) * radius)
+        local pos2 = Vector3.new(math.cos(angle2) * radius, yOffset, math.sin(angle2) * radius)
+        local att1 = Instance.new("Attachment") att1.Position = pos1 att1.Parent = folder
+        local att2 = Instance.new("Attachment") att2.Position = pos2 att2.Parent = folder
+        local beam = Instance.new("Beam") beam.Attachment0 = att1 beam.Attachment1 = att2 beam.Color = ColorSequence.new(ParryRangeVisual.Color) beam.Transparency = NumberSequence.new(ParryRangeVisual.Transparency) beam.Width0 = 0.3 beam.Width1 = 0.3 beam.FaceCamera = true beam.Parent = folder
     end
+    Visuals.Circle = folder
 end
-
-function SetupPlayer(p)
-    if p == player then return end
-    p.CharacterAdded:Connect(function() TryAttach(p) end)
-    p:GetPropertyChangedSignal("Team"):Connect(function() TryAttach(p) end)
-    if p.Character then TryAttach(p) end
+local function V1_UpdateParryCircle()
+    if not ParryRangeVisual.Enabled then if Visuals.Circle then Visuals.Circle:Destroy() Visuals.Circle = nil end return end
+    if not Visuals.Circle then V1_CreateCircle() end
 end
+task.spawn(function() while true do task.wait(0.5) if AutoParryV1.Enabled then V1_UpdateParryCircle() end end end)
 
--- Setup Parry Sensor
-for _, p in pairs(Players:GetPlayers()) do 
-    SetupPlayer(p) 
-end
-Players.PlayerAdded:Connect(SetupPlayer)
+--========================================================--
+-- PARRY V1 BUTTON
+--========================================================--
 
-task.spawn(function()
-    while true do 
-        task.wait(5) 
-        for _, p in pairs(Players:GetPlayers()) do 
-            TryAttach(p) 
-        end 
-    end
-end)
+local ParryV1Button = { GuiInstance = nil, Active = false }
 
+local function CreateParryV1Button()
+    if ParryV1Button.GuiInstance then ParryV1Button.GuiInstance:Destroy() end
 
-function VD_SetAutoParry(state)
-    VD.SURV_AutoParry = state == true
-    if VD.SURV_AutoParry then
-        if not _G.VD_ParryRenderConnection then
-            _G.VD_ParryRenderConnection = game:GetService('RunService').RenderStepped:Connect(function()
-                if type(VD_UpdateParryRange) == 'function' then VD_UpdateParryRange() end
-            end)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "ParryV1Gui"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = game:GetService("CoreGui")
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 140, 0, 40)
+    btn.Position = UDim2.new(0.3, 0, 0.75, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    btn.BackgroundTransparency = 0.3
+    btn.Text = "PARRY : OFF"
+    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = false
+    btn.Parent = gui
+
+    local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 10) corner.Parent = btn
+    local stroke = Instance.new("UIStroke") stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border stroke.Thickness = 1.5 stroke.Color = Color3.fromRGB(150, 150, 150) stroke.Transparency = 0 stroke.Parent = btn
+
+    local function updateText()
+        if ParryV1Button.Active then
+            btn.Text = "PARRY : ON"
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            stroke.Color = Color3.fromRGB(255, 255, 255)
+        else
+            btn.Text = "PARRY : OFF"
+            btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+            stroke.Color = Color3.fromRGB(150, 150, 150)
         end
-    else
-        if typeof(VD_ParryRange) == 'Instance' then VD_ParryRange.Transparency = 1 end
-        if _G.VD_ParryRenderConnection then
-            _G.VD_ParryRenderConnection:Disconnect()
-            _G.VD_ParryRenderConnection = nil
-        end
     end
+
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+    local moved = false
+
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            moved = false
+            dragInput = input
+            dragStart = input.Position
+            startPos = btn.Position
+        end
+    end)
+
+    btn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging or input ~= dragInput then return end
+        local delta = input.Position - dragStart
+        if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then moved = true end
+        btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and not moved then
+                ParryV1Button.Active = not ParryV1Button.Active
+                AutoParryV1.Enabled = ParryV1Button.Active
+                if ParryV1Button.Active then
+                    ParryRangeVisual.Enabled = true
+                    V1_CreateCircle()
+                    V1_ScanKillers()
+                else
+                    ParryRangeVisual.Enabled = false
+                    if Visuals.Circle then Visuals.Circle:Destroy() Visuals.Circle = nil end
+                end
+                updateText()
+            end
+            dragging = false
+        end
+    end)
+
+    ParryV1Button.GuiInstance = gui
 end
+
+local function RemoveParryV1Button()
+    if ParryV1Button.GuiInstance then ParryV1Button.GuiInstance:Destroy() ParryV1Button.GuiInstance = nil end
+    ParryV1Button.Active = false
+end
+
 
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local AutoSkill = {
@@ -4502,6 +4485,150 @@ AutoHealAllConnection = nil
 InstantHealConnection = nil
 AutoSelfUnhookConnection = nil
 
+-- =====================================================
+-- SELF HEAL FLOATING BUTTON
+-- =====================================================
+local SelfHealButton = {
+    UI = nil,
+    Button = nil,
+    Stroke = nil,
+    Dragging = false,
+    DragStart = nil,
+    DragStartPos = nil,
+}
+
+function SelfHeal_SetDragLocked(v)
+    VD.SelfHealButton_DragLocked = v and true or false
+    SelfHealButton.Dragging = false
+    if SelfHealButton.Button then
+        SelfHealButton.Button.Active = true
+        if SelfHealButton.Stroke then
+            SelfHealButton.Stroke.Transparency = VD.SelfHealButton_DragLocked and 0.25 or 0.05
+        end
+    end
+end
+
+function SelfHeal_UpdateButton()
+    if not SelfHealButton.Button then return end
+
+    if InstantHealSelf then
+        SelfHealButton.Button.BackgroundColor3 = Color3.fromRGB(20, 75, 35)
+        SelfHealButton.Button.TextColor3 = Color3.fromRGB(120, 255, 160)
+        if SelfHealButton.Stroke then
+            SelfHealButton.Stroke.Color = Color3.fromRGB(80, 255, 130)
+        end
+    else
+        SelfHealButton.Button.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        SelfHealButton.Button.TextColor3 = Color3.fromRGB(220, 220, 220)
+        if SelfHealButton.Stroke then
+            SelfHealButton.Stroke.Color = Color3.fromRGB(180, 180, 180)
+        end
+    end
+end
+
+function SelfHeal_DestroyButton()
+    if SelfHealButton.UI then
+        pcall(function() SelfHealButton.UI:Destroy() end)
+    end
+    SelfHealButton.UI = nil
+    SelfHealButton.Button = nil
+    SelfHealButton.Stroke = nil
+    SelfHealButton.Dragging = false
+end
+
+function SelfHeal_CreateButton()
+    if not VD.SelfHealButtonVisible then return end
+
+    local pg = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 10)
+    if not pg then return end
+
+    SelfHeal_DestroyButton()
+
+    SelfHealButton.UI = Instance.new("ScreenGui")
+    SelfHealButton.UI.Name = "SelfHealFloatingUI"
+    SelfHealButton.UI.ResetOnSpawn = false
+    SelfHealButton.UI.IgnoreGuiInset = true
+    SelfHealButton.UI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    SelfHealButton.UI.DisplayOrder = 999998
+    SelfHealButton.UI.Parent = pg
+
+    local btn = Instance.new("TextButton")
+    btn.Name = "SelfHealButton"
+    btn.Size = UDim2.new(0, 65, 0, 65)
+    btn.Position = UDim2.new(0.78, 0, 0.75, 0)
+    btn.AnchorPoint = Vector2.new(0.5, 0.5)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    btn.BackgroundTransparency = 0.12
+    btn.AutoButtonColor = false
+    btn.Text = "♥\nSELF\nHEAL"
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.GothamBold
+    btn.ZIndex = 10
+    btn.Parent = SelfHealButton.UI
+
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(180, 180, 180)
+    stroke.Thickness = 2
+    stroke.Transparency = 0.05
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = btn
+
+    SelfHealButton.Button = btn
+    SelfHealButton.Stroke = stroke
+    SelfHeal_UpdateButton()
+    SelfHeal_SetDragLocked(VD.SelfHealButton_DragLocked)
+
+    -- Drag: works on PC and mobile.
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            if VD.SelfHealButton_DragLocked then return end
+            SelfHealButton.Dragging = true
+            SelfHealButton.DragStart = input.Position
+            SelfHealButton.DragStartPos = btn.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not SelfHealButton.Dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - SelfHealButton.DragStart
+            btn.Position = UDim2.new(
+                SelfHealButton.DragStartPos.X.Scale,
+                SelfHealButton.DragStartPos.X.Offset + delta.X,
+                SelfHealButton.DragStartPos.Y.Scale,
+                SelfHealButton.DragStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    btn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            SelfHealButton.Dragging = false
+        end
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        setInstantHealSelf(not InstantHealSelf)
+        SelfHeal_UpdateButton()
+
+        -- Sync the main Aura Heal toggle.
+        local elem = Window and Window.ConfigElements and Window.ConfigElements["Instant Heal (Self)"]
+        if elem and elem.Set then
+            pcall(function()
+                elem:Set(InstantHealSelf)
+            end)
+        end
+    end)
+
+    print("[ALFzxzzzHub] Self Heal floating button created successfully")
+end
+
 function doSelfHeal()
 	local char = LocalPlayer.Character
 	if not char then return end
@@ -4590,6 +4717,13 @@ function setInstantHealSelf(v)
         pcall(doSelfHealFalse)
     end
 end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if VD.SelfHealButtonVisible then
+        pcall(SelfHeal_CreateButton)
+    end
+end)
 
 function setAutoHealAll(v)
     AutoHealAll = v
@@ -4785,8 +4919,7 @@ function GB_CreateButton()
     GenBypass.Button.BackgroundTransparency = 0.15
     GenBypass.Button.AutoButtonColor = true
     GenBypass.Button.Visible = false
-    GenBypass.Button.ZIndex = 10
-    GenBypass.Button.Parent = GenBypass.UI
+    GenBypass.Button.ZIndex = 10    GenBypass.Button.Parent = GenBypass.UI
     Instance.new("UICorner", GenBypass.Button).CornerRadius = UDim.new(1, 0)
     
     local s = Instance.new("UIStroke", GenBypass.Button)
@@ -4796,7 +4929,7 @@ function GB_CreateButton()
     local lbl = Instance.new("TextLabel", GenBypass.Button)
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text = "BYPASS"
+    lbl.Text = "GEN"
     lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBlack
@@ -4999,7 +5132,7 @@ function setupMyersGrabBtn()
         end)
     end
     
-    applyShine(MyersGrabData.Button, Color3.fromRGB(20, 0, 30))
+    applyShine(MyersGrabData.Button, Color3.fromRGB(45, 45, 45))
     applyShine(lbl, Color3.fromRGB(204, 204, 204))
     applyShine(s, Color3.fromRGB(204, 204, 204))
 
@@ -5092,7 +5225,7 @@ VeilDraw = {
     Tracer    = Drawing.new("Circle"),
 }
 
-VeilDraw.FOVCircle.Color     = Color3.fromRGB(128, 128, 128)
+VeilDraw.FOVCircle.Color     = Color3.fromRGB(148, 148, 148)
 VeilDraw.FOVCircle.Thickness = 1.5
 VeilDraw.FOVCircle.Filled    = false
 VeilDraw.FOVCircle.Visible   = false
@@ -5105,7 +5238,7 @@ VeilDraw.Highlight.OutlineTransparency = 0
 
 VeilDraw.Tracer.Thickness = 2
 VeilDraw.Tracer.Radius    = 5
-VeilDraw.Tracer.Color     = Color3.fromRGB(128, 128, 128)
+VeilDraw.Tracer.Color     = Color3.fromRGB(95, 95, 95)
 VeilDraw.Tracer.Filled    = true
 VeilDraw.Tracer.Visible   = false
 
@@ -5825,9 +5958,227 @@ do -- Player Tab
     })
     movSection:AddToggle({ Default = false, Name = "Anti AFK", Flag = "Anti AFK", Callback = function(v) VD.AntiAFK = v end })
 
+    -- =====================================================
+    -- TELEPORT FORWARD (Floating Button + Slider)
+    -- =====================================================
+    movSection:AddDivider({ Text = "Teleport Forward" })
+    
+    movSection:AddToggle({
+        Default = false,
+        Name = "Teleport Forward (Button + T key)",
+        Flag = "Teleport Forward",
+        Callback = function(state)
+            VD.TeleportForward_Enabled = state and true or false
+            if VD.TeleportForward_Enabled then
+                TeleportForward_CreateButton()
+                VD_Notify("Teleport Forward", "Aktif! Tekan T atau klik tombol untuk teleport maju", 3)
+            else
+                TeleportForward_DestroyButton()
+                VD_Notify("Teleport Forward", "Nonaktif", 2)
+            end
+        end
+    })
+    
+    movSection:AddSlider({
+        Name = "Teleport Distance (studs)",
+        Flag = "Teleport Distance",
+        Min = 5,
+        Max = 200,
+        Default = 50,
+        Increment = 1,
+        Suffix = " studs",
+        Callback = function(value)
+            VD.TeleportForward_Distance = value
+        end
+    })
+    
+    movSection:AddToggle({
+        Default = false,
+        Name = "Lock Teleport Button Position",
+        Flag = "Lock Teleport Button",
+        Callback = function(state)
+            VD.TeleportForward_DragLocked = state and true or false
+            TeleportForward_SetDragLocked(state)
+        end
+    })
+
     -- removed PlayerTab AddDivider
 end
 
+-- =====================================================
+-- TELEPORT FORWARD IMPLEMENTATION
+-- =====================================================
+local TeleportForward = {
+    UI = nil,
+    Button = nil,
+    Dragging = false,
+    DragStart = nil,
+    DragStartPos = nil,
+}
+
+function TeleportForward_DoTeleport()
+    if not VD.TeleportForward_Enabled then return end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    
+    local lookVector = cam.CFrame.LookVector
+    local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+    local distance = VD.TeleportForward_Distance or 50
+    
+    local newPos = root.Position + (flatLook * distance)
+    root.CFrame = CFrame.new(newPos)
+    
+    -- Efek visual kecil
+    pcall(function()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            task.wait(0.05)
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
+    end)
+end
+
+function TeleportForward_CreateButton()
+    if not VD.TeleportForward_Enabled then return end
+    
+    local pg = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 10)
+    if not pg then return end
+    
+    TeleportForward_DestroyButton()
+    
+    TeleportForward.UI = Instance.new("ScreenGui")
+    TeleportForward.UI.Name = "TeleportForwardUI"
+    TeleportForward.UI.ResetOnSpawn = false
+    TeleportForward.UI.IgnoreGuiInset = true
+    TeleportForward.UI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    TeleportForward.UI.DisplayOrder = 999997
+    TeleportForward.UI.Parent = pg
+    
+    TeleportForward.Button = Instance.new("ImageButton")
+    TeleportForward.Button.Name = "TeleportForwardButton"
+    TeleportForward.Button.Size = UDim2.new(0, 60, 0, 60)
+    TeleportForward.Button.Position = UDim2.new(0.6, 0, 0.75, 0)
+    TeleportForward.Button.AnchorPoint = Vector2.new(0.5, 0.5)
+    TeleportForward.Button.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+    TeleportForward.Button.BackgroundTransparency = 0.15
+    TeleportForward.Button.AutoButtonColor = true
+    TeleportForward.Button.Visible = true
+    TeleportForward.Button.ZIndex = 10
+    TeleportForward.Button.Parent = TeleportForward.UI
+    Instance.new("UICorner", TeleportForward.Button).CornerRadius = UDim.new(1, 0)
+    
+    local stroke = Instance.new("UIStroke", TeleportForward.Button)
+    stroke.Color = Color3.fromRGB(100, 180, 255)
+    stroke.Thickness = 2
+    stroke.Transparency = 0.2
+    
+    local label = Instance.new("TextLabel", TeleportForward.Button)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "⏩\nTP FWD"
+    label.TextColor3 = Color3.fromRGB(200, 220, 255)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBlack
+    label.ZIndex = 11
+    
+    -- Lock drag button
+    local lockBtn = Instance.new("TextButton")
+    lockBtn.Name = "LockDrag"
+    lockBtn.Size = UDim2.new(0, 22, 0, 22)
+    lockBtn.Position = UDim2.new(1, -5, 0, -5)
+    lockBtn.AnchorPoint = Vector2.new(1, 0)
+    lockBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    lockBtn.BackgroundTransparency = 0.3
+    lockBtn.Text = VD.TeleportForward_DragLocked and "X" or "L"
+    lockBtn.TextSize = 10
+    lockBtn.Font = Enum.Font.GothamBold
+    lockBtn.TextColor3 = Color3.new(1, 1, 1)
+    lockBtn.ZIndex = 11
+    lockBtn.Parent = TeleportForward.Button
+    Instance.new("UICorner", lockBtn).CornerRadius = UDim.new(1, 0)
+    
+    lockBtn.MouseButton1Click:Connect(function()
+        VD.TeleportForward_DragLocked = not VD.TeleportForward_DragLocked
+        lockBtn.Text = VD.TeleportForward_DragLocked and "X" or "L"
+        lockBtn.BackgroundColor3 = VD.TeleportForward_DragLocked and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 60, 60)
+        -- Sync UI
+        local flagName = VD_To_Flag and VD_To_Flag.TeleportForward_DragLocked
+        local elem = flagName and Window and Window.ConfigElements and Window.ConfigElements[flagName]
+        if elem and elem.Set then
+            pcall(function() elem:Set(VD.TeleportForward_DragLocked) end)
+        end
+    end)
+    
+    -- Drag logic
+    TeleportForward.Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if VD.TeleportForward_DragLocked then return end
+            TeleportForward.Dragging = true
+            TeleportForward.DragStart = input.Position
+            TeleportForward.DragStartPos = TeleportForward.Button.Position
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if TeleportForward.Dragging and not VD.TeleportForward_DragLocked and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - TeleportForward.DragStart
+            TeleportForward.Button.Position = UDim2.new(
+                TeleportForward.DragStartPos.X.Scale, TeleportForward.DragStartPos.X.Offset + delta.X,
+                TeleportForward.DragStartPos.Y.Scale, TeleportForward.DragStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    TeleportForward.Button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            TeleportForward.Dragging = false
+        end
+    end)
+    
+    TeleportForward.Button.MouseButton1Click:Connect(TeleportForward_DoTeleport)
+end
+
+function TeleportForward_DestroyButton()
+    if TeleportForward.UI then
+        pcall(function() TeleportForward.UI:Destroy() end)
+        TeleportForward.UI = nil
+        TeleportForward.Button = nil
+    end
+end
+
+function TeleportForward_SetDragLocked(state)
+    VD.TeleportForward_DragLocked = state and true or false
+    if TeleportForward.Button then
+        local lockBtn = TeleportForward.Button:FindFirstChild("LockDrag")
+        if lockBtn then
+            lockBtn.Text = state and "X" or "L"
+            lockBtn.BackgroundColor3 = state and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 60, 60)
+        end
+    end
+end
+
+-- Keybind T untuk teleport forward (PC)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T and VD.TeleportForward_Enabled then
+        TeleportForward_DoTeleport()
+    end
+end)
+
+-- Respawn handler
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if VD.TeleportForward_Enabled then
+        TeleportForward_CreateButton()
+    end
+end)
+
+-- =====================================================
 do -- ESP Tab
     -- Visual Highlight ESP baru masuk di sini.
     -- Drawing ESP PC lama tetap dipertahankan.
@@ -6295,11 +6646,11 @@ do -- FOV Tab
         Opened    = true,
     })
 
-    MAWWW_AddMainInfoLine(infoPanelSection, "ALFzxzzzKiller", "ALFzxzzz Killer Display", "Off")
+    MAWWW_AddMainInfoLine(infoPanelSection, "NextKiller", "Next Killer Display", "Off")
     MAWWW_AddMainInfoLine(infoPanelSection, "KillerPerks", "Spectate Killer Perks", "Off")
     MAWWW_AddMainInfoLine(infoPanelSection, "PredictMap", "Predict Map", "Off")
 
-    visualSection:AddToggle({ Default = false, Name = "ALFzxzzz Killer Display", Flag = "ALFzxzzz Killer Display", Callback = function(v) 
+    visualSection:AddToggle({ Default = false, Name = "Next Killer Display", Flag = "Next Killer Display", Callback = function(v) 
         VD.VIS_ALFzxzzzKiller = v 
         if v then
             StartALFzxzzzKiller()
@@ -6379,7 +6730,7 @@ do -- Survivor Tab
     combatSurv:AddSlider({
         Name = "Vault Speed", Flag = "SURV_SwiftVaultSpeed",
         Min = 10, Max = 20, Default = 13, Increment = 1,
-        Callback = function(v) VD.SURV_VaultSpeed = v end
+        Callback = function(v) VD.SURF_VaultSpeed = v end
     })
     combatSurv:AddToggle({ Default = false, Name = "Pallet Reflex", Flag = "Pallet Reflex", Callback = function(v) VD.SURV_AutoPallet = v end })
     combatSurv:AddSlider({
@@ -6394,7 +6745,39 @@ do -- Survivor Tab
         end
         VD.SURV_AntiKnock = v 
     end })
-    combatSurv:AddToggle({ Default = false, Name = "Aura Heal (Self)", Flag = "Instant Heal (Self)", Callback = function(v) setInstantHealSelf(v) end })
+    combatSurv:AddToggle({
+        Default = false,
+        Name = "Aura Heal (Self)",
+        Flag = "Instant Heal (Self)",
+        Callback = function(v)
+            setInstantHealSelf(v)
+            SelfHeal_UpdateButton()
+        end
+    })
+
+    combatSurv:AddToggle({
+        Default = false,
+        Name = "Show Self Heal Button",
+        Flag = "Show Self Heal Button",
+        Callback = function(v)
+            VD.SelfHealButtonVisible = v and true or false
+            if VD.SelfHealButtonVisible then
+                SelfHeal_CreateButton()
+            else
+                SelfHeal_DestroyButton()
+            end
+        end
+    })
+
+    combatSurv:AddToggle({
+        Default = false,
+        Name = "Lock Self Heal Button Position",
+        Flag = "Lock Self Heal Button Position",
+        Callback = function(state)
+            VD.SelfHealButton_DragLocked = state and true or false
+            SelfHeal_SetDragLocked(state)
+        end
+    })
     combatSurv:AddToggle({ Default = false, Name = "Auto Dodge Spear (Veil)", Locked = false, TextLocked = "Premium Required", Flag = "Auto Dodge Spear", Callback = function(v)
         if v and false then
             pcall(VD_Notify, "Premium Required ✨", "Fitur Auto Dodge Spear hanya untuk pengguna Key Premium!", 5)
@@ -6417,28 +6800,87 @@ do -- Survivor Tab
             pcall(RestoreFirstPersonCamera)
         end
     end })
-    combatSurv:AddToggle({ Default = false, Name = "Auto Parry", Locked = false, TextLocked = "Premium Required", Flag = "Auto Parry", Callback = function(v)
-        if v and false then
-            pcall(VD_Notify, "Premium Required ✨", "Fitur Auto Parry hanya untuk pengguna Key Premium!", 5)
-            return
-        end
-        VD_SetAutoParry(v)
-    end })
-    combatSurv:AddToggle({ Default = false, Name = "Auto Parry Agresif", Flag = "Auto Parry Agresif", Callback = function(v) VD.SURV_ParryAggressive = v end })
-    
-    combatSurv:AddSlider({
-        Name = "Parry Distance Trigger", Flag = "Parry Distance Trigger",
-        Min = 2, Max = 25, Default = 8, Increment = 0.1,
+    combatSurv:AddToggle({
+        Default = false,
+        Name = "Auto Parry V1",
+        Flag = "Auto Parry V1",
         Callback = function(v)
-            VD.SURV_ParryDistance = v
+            AutoParryV1.Enabled = v and true or false
+            VD.SURV_AutoParry = AutoParryV1.Enabled
+            if AutoParryV1.Enabled then
+                ParryRangeVisual.Enabled = true
+                V1_CreateCircle()
+                V1_ScanKillers()
+            else
+                ParryRangeVisual.Enabled = false
+                if Visuals.Circle then
+                    Visuals.Circle:Destroy()
+                    Visuals.Circle = nil
+                end
+            end
+            if not AutoParryV1.Enabled then
+                VD.SURV_AutoParry = false
+            end
         end
     })
+
     combatSurv:AddToggle({
-        Default = false, Name = "Show Parry Range Circle", Flag = "Show Parry Range Circle", Callback = function(v)
-        VD.SURV_ShowParryCircle = v
-        if VD_ParryRange then VD_ParryRange.Transparency = 1 end
-    end })
-    
+        Default = false,
+        Name = "Show Parry V1 Button",
+        Flag = "Show Parry V1 Button",
+        Callback = function(v)
+            if v then
+                CreateParryV1Button()
+            else
+                RemoveParryV1Button()
+            end
+        end
+    })
+
+    combatSurv:AddToggle({
+        Default = false,
+        Name = "Show Parry V1 Range",
+        Flag = "Show Parry V1 Range",
+        Callback = function(v)
+            ParryRangeVisual.Enabled = v and true or false
+            if ParryRangeVisual.Enabled and AutoParryV1.Enabled then
+                V1_CreateCircle()
+            elseif not ParryRangeVisual.Enabled then
+                if Visuals.Circle then
+                    Visuals.Circle:Destroy()
+                    Visuals.Circle = nil
+                end
+            end
+        end
+    })
+
+    combatSurv:AddSlider({
+        Name = "Parry V1 Range",
+        Flag = "Parry V1 Range",
+        Min = 5,
+        Max = 20,
+        Default = 15,
+        Increment = 1,
+        Callback = function(v)
+            AutoParryV1.ParryDistance = v
+            if ParryRangeVisual.Enabled and AutoParryV1.Enabled then
+                V1_CreateCircle()
+            end
+        end
+    })
+
+    combatSurv:AddSlider({
+        Name = "Parry V1 Face Sensitivity",
+        Flag = "Parry V1 Face Sensitivity",
+        Min = -1,
+        Max = 1,
+        Default = 0.7,
+        Increment = 0.01,
+        Callback = function(v)
+            AutoParryV1.FaceSensitivity = v
+        end
+    })
+
     combatSurv:AddToggle({ Default = false, Name = "Fake Parry (Press V)", Flag = "Fake Parry (Press V)", Callback = function(v) 
         VD.SURV_FakeParry = v
         if FakeParryData.Button then FakeParryData.Button.Visible = v end
@@ -6513,7 +6955,7 @@ function setupFakeParryBtn()
     FakeParryData.Button.Size = UDim2.new(0, 60, 0, 60)
     FakeParryData.Button.Position = UDim2.new(0.3, 0, 0.75, 0)
     FakeParryData.Button.AnchorPoint = Vector2.new(0.5, 0.5)
-    FakeParryData.Button.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    FakeParryData.Button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     FakeParryData.Button.BackgroundTransparency = 0.15
     FakeParryData.Button.AutoButtonColor = true
     if type(VD) == "table" then FakeParryData.Button.Visible = VD.SURV_FakeParry else FakeParryData.Button.Visible = false end
@@ -6522,14 +6964,14 @@ function setupFakeParryBtn()
     Instance.new("UICorner", FakeParryData.Button).CornerRadius = UDim.new(1, 0)
     
     local s = Instance.new("UIStroke", FakeParryData.Button)
-    s.Color = Color3.fromRGB(128, 128, 128)
+    s.Color = Color3.fromRGB(222, 222, 222)
     s.Thickness = 2; s.Transparency = 0.2
     
     local lbl = Instance.new("TextLabel", FakeParryData.Button)
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "FAKE\nPARRY"
-    lbl.TextColor3 = Color3.fromRGB(128, 128, 128)
+    lbl.TextColor3 = Color3.fromRGB(233, 233, 233)
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBlack
     lbl.ZIndex = 11
@@ -6633,7 +7075,7 @@ function VD_ToggleFakeGen()
             getgenv().MAWWW_FakeGenTrack = nil
         end
         if FakeGenData.Button then
-            FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(20, 30, 0)
+            FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         end
         return
     end
@@ -6668,7 +7110,7 @@ function VD_ToggleFakeGen()
             getgenv().MAWWW_FakeGenTrack = track
             
             if FakeGenData.Button then
-                FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+                FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
             end
         end)
     end
@@ -6690,7 +7132,7 @@ function setupFakeGenBtn()
     FakeGenData.Button.Size = UDim2.new(0, 60, 0, 60)
     FakeGenData.Button.Position = UDim2.new(0.4, 0, 0.75, 0)
     FakeGenData.Button.AnchorPoint = Vector2.new(0.5, 0.5)
-    FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    FakeGenData.Button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     FakeGenData.Button.BackgroundTransparency = 0.15
     FakeGenData.Button.AutoButtonColor = true
     if type(VD) == "table" then FakeGenData.Button.Visible = VD.SURV_FakeGen else FakeGenData.Button.Visible = false end
@@ -6699,14 +7141,14 @@ function setupFakeGenBtn()
     Instance.new("UICorner", FakeGenData.Button).CornerRadius = UDim.new(1, 0)
     
     local s = Instance.new("UIStroke", FakeGenData.Button)
-    s.Color = Color3.fromRGB(128, 128, 128)
+    s.Color = Color3.fromRGB(222, 222, 222)
     s.Thickness = 2; s.Transparency = 0.2
     
     local lbl = Instance.new("TextLabel", FakeGenData.Button)
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "FAKE\nGEN"
-    lbl.TextColor3 = Color3.fromRGB(128, 128, 128)
+    lbl.TextColor3 = Color3.fromRGB(222, 222, 222)
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBlack
     lbl.ZIndex = 11
@@ -8551,11 +8993,11 @@ local VD_MoonwalkState = {
 function VD_RefreshMoonwalkButton()
     local btn = VD_MoonwalkState.Button
     if not (btn and btn.Parent) then return end
-    btn.BackgroundColor3 = VD.Moonwalk and Color3.fromRGB(35, 185, 95) or Color3.fromRGB(20, 0, 30)
+    btn.BackgroundColor3 = VD.Moonwalk and Color3.fromRGB(45, 45, 45) or Color3.fromRGB(45, 45, 45)
     local label = VD_MoonwalkState.ButtonLabel
     if label and label.Parent then
         label.Text = VD.Moonwalk and "ON" or "OFF"
-        label.TextColor3 = VD.Moonwalk and Color3.fromRGB(190, 255, 210) or Color3.fromRGB(255, 255, 255)
+        label.TextColor3 = VD.Moonwalk and Color3.fromRGB(222, 222, 222) or Color3.fromRGB(255, 255, 255)
     end
 end
 
@@ -8601,7 +9043,7 @@ function VD_CreateMoonwalkButton()
     btn.Size = UDim2.new(0, 60, 0, 60)
     btn.Position = UDim2.new(0.88, 0, 0.43, 0)
     btn.AnchorPoint = Vector2.new(0.5, 0.5)
-    btn.BackgroundColor3 = Color3.fromRGB(20, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     btn.BackgroundTransparency = 0.15
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = true
@@ -8611,7 +9053,7 @@ function VD_CreateMoonwalkButton()
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
     local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Color = Color3.fromRGB(222, 222, 222)
     stroke.Thickness = 2
     stroke.Transparency = 0.2
 
@@ -8620,7 +9062,7 @@ function VD_CreateMoonwalkButton()
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "OFF"
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextColor3 = Color3.fromRGB(222, 222, 222)
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBlack
     lbl.ZIndex = 11
@@ -8645,9 +9087,9 @@ function VD_CreateMoonwalkButton()
         end)
     end
 
-    pcall(applyShine, btn, Color3.fromRGB(20, 0, 30))
-    pcall(applyShine, lbl, Color3.fromRGB(255, 0, 255))
-    pcall(applyShine, stroke, Color3.fromRGB(255, 0, 255))
+    pcall(applyShine, btn, Color3.fromRGB(45, 45, 45))
+    pcall(applyShine, lbl, Color3.fromRGB(222, 222, 222))
+    pcall(applyShine, stroke, Color3.fromRGB(255, 255, 255))
 
     local dragging = false
     local dragStart, startPos
@@ -8778,11 +9220,11 @@ end
 local function VD_RefreshAimLockButton()
     local btn = VD_AimLockState.Button
     if not (btn and btn.Parent) then return end
-    btn.BackgroundColor3 = VD_AimLockState.Active and Color3.fromRGB(185, 50, 50) or Color3.fromRGB(20, 0, 30)
+    btn.BackgroundColor3 = VD_AimLockState.Active and Color3.fromRGB(45, 45, 45) or Color3.fromRGB(45, 45, 45)
     local label = VD_AimLockState.ButtonLabel
     if label and label.Parent then
         label.Text = VD_AimLockState.Active and "ON" or "OFF"
-        label.TextColor3 = VD_AimLockState.Active and Color3.fromRGB(255, 200, 200) or Color3.fromRGB(255, 255, 255)
+        label.TextColor3 = VD_AimLockState.Active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(158, 158, 158)
     end
 end
 
@@ -8831,7 +9273,7 @@ local function VD_CreateAimLockButton()
     btn.Size = UDim2.new(0, 60, 0, 60)
     btn.Position = UDim2.new(0.88, 0, 0.55, 0)
     btn.AnchorPoint = Vector2.new(0.5, 0.5)
-    btn.BackgroundColor3 = Color3.fromRGB(20, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     btn.BackgroundTransparency = 0.15
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = true
@@ -8841,7 +9283,7 @@ local function VD_CreateAimLockButton()
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
     local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(255, 70, 70)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
     stroke.Thickness = 2
     stroke.Transparency = 0.2
 
@@ -8850,7 +9292,7 @@ local function VD_CreateAimLockButton()
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "OFF"
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextColor3 = Color3.fromRGB(158, 158, 158)
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBlack
     lbl.ZIndex = 11
@@ -8875,9 +9317,9 @@ local function VD_CreateAimLockButton()
         end)
     end
 
-    pcall(applyShine, btn, Color3.fromRGB(20, 0, 30))
-    pcall(applyShine, lbl, Color3.fromRGB(255, 50, 50))
-    pcall(applyShine, stroke, Color3.fromRGB(255, 50, 50))
+    pcall(applyShine, btn, Color3.fromRGB(45, 45, 45))
+    pcall(applyShine, lbl, Color3.fromRGB(158, 158, 158))
+    pcall(applyShine, stroke, Color3.fromRGB(255, 255, 255))
 
     local dragging = false
     local dragStart, startPos
@@ -9225,13 +9667,13 @@ local radarObjectDots = {}
 
 local RADAR_COLORS = {
     Killer = Color3.fromRGB(255, 0, 0), -- Merah untuk Killer
-    Survivor = Color3.fromRGB(255, 165, 0), -- Oranye untuk Survivor (tim)
-    Generator = Color3.fromRGB(255, 140, 0),
-    Gate = Color3.fromRGB(100, 200, 255),
+    Survivor = Color3.fromRGB(0, 255, 255), -- Oranye untuk Survivor (tim)
+    Generator = Color3.fromRGB(255, 170, 0),
+    Gate = Color3.fromRGB(255, 255, 255),
     Pallet = Color3.fromRGB(53, 189, 166),
     Hook = Color3.fromRGB(252, 116, 116),
     Window = Color3.fromRGB(80, 160, 255),
-    Zombie = Color3.fromRGB(150, 255, 50)
+    Zombie = Color3.fromRGB(0, 255, 0)
 }
 
 local MaskColors = {
@@ -9277,14 +9719,14 @@ function CreateRadarGUI()
     corner.Parent = radarFrame
     
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 170, 255)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
     stroke.Thickness = 2
     stroke.Parent = radarFrame
     
     local titleText = Instance.new("TextLabel")
     titleText.Size = UDim2.new(1, 0, 0, 20)
     titleText.BackgroundTransparency = 1
-    titleText.Text = "MAWWWHUB RADAR"
+    titleText.Text = "ALFzxzz Radar"
     titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleText.Font = Enum.Font.SourceSansBold
     titleText.TextSize = 12
@@ -9321,7 +9763,7 @@ function CreateRadarGUI()
     rangeText.Position = UDim2.new(0, 0, 1, -14)
     rangeText.BackgroundTransparency = 1
     rangeText.Text = "Range: ".. VD.RADAR_Range.. "m"
-    rangeText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    rangeText.TextColor3 = Color3.fromRGB(220, 220, 220)
     rangeText.Font = Enum.Font.SourceSans
     rangeText.TextSize = 10
     rangeText.Parent = radarFrame
@@ -9790,7 +10232,7 @@ RunService.Heartbeat:Connect(function()
         pcall(function()
             local char = LocalPlayer.Character
             if char then
-                char:SetAttribute("vaultspeed", (VD.SURV_VaultSpeed or 13) / 10)
+                char:SetAttribute("vaultspeed", (VD.SURF_VaultSpeed or 13) / 10)
             end
         end)
     end
@@ -10803,7 +11245,7 @@ function MAWWW_UpdateCureFlaskLaser()
             laser.CanTouch = false
             laser.CastShadow = false
             laser.Material = Enum.Material.Neon
-            laser.Color = Color3.fromRGB(0, 100, 255)
+            laser.Color = Color3.fromRGB(255, 255, 255)
             laser.Transparency = 0
             laser.Parent = workspace
             getgenv().MAWWW_CureFlaskLaserPart = laser
@@ -11107,8 +11549,7 @@ end
 -- =====================================================
 local function MAWWW_BeatGameSurvivor()
     if not VD.BEAT_Survivor or GetRole() ~= "Survivor" then return end
-    local root = Root
-    if not root then return end
+    local root = Root    if not root then return end
     local map = Workspace:FindFirstChild("Map")
 
     local exitPos = nil
@@ -11947,7 +12388,7 @@ getgenv().MAWWW_MawwwtKillerRunning = false
 function SetupMawwwtKillerIndicator()
     if getgenv().MAWWW_MawwwtKillerGui then pcall(function() getgenv().MAWWW_MawwwtKillerGui:Destroy() end) end
     getgenv().MAWWW_MawwwtKillerGui = nil
-    MAWWW_SetMainInfoPanelText("ALFzxzzzKiller", "ALFzxzzz Killer Display", "Waiting...")
+    MAWWW_SetMainInfoPanelText("NextKiller", "Next Killer Display", "Waiting...")
 end
 
 function StartALFzxzzzKiller()
@@ -11967,9 +12408,9 @@ function StartALFzxzzzKiller()
             
             local nk = playersList[1]
             if nk then
-                MAWWW_SetMainInfoPanelText("ALFzxzzzKiller", "ALFzxzzz Killer Display", "ALFzxzzz Killer: " .. (nk == LocalPlayer and "YOU" or nk.DisplayName or nk.Name))
+                MAWWW_SetMainInfoPanelText("NextKiller", "Next Killer Display", "Next Killer: " .. (nk == LocalPlayer and "YOU" or nk.DisplayName or nk.Name))
             else
-                MAWWW_SetMainInfoPanelText("ALFzxzzzKiller", "ALFzxzzz Killer Display", "ALFzxzzz Killer: None")
+                MAWWW_SetMainInfoPanelText("NextKiller", "Next Killer Display", "Next Killer: None")
             end
             task.wait(2)
         end
@@ -11982,7 +12423,7 @@ function StopALFzxzzzKiller()
         pcall(function() getgenv().MAWWW_MawwwtKillerGui:Destroy() end)
         getgenv().MAWWW_MawwwtKillerGui = nil
     end
-    MAWWW_SetMainInfoPanelText("ALFzxzzzKiller", "ALFzxzzz Killer Display", "Off")
+    MAWWW_SetMainInfoPanelText("NextKiller", "Next Killer Display", "Off")
 end
 
 -- =====================================================
@@ -13147,6 +13588,13 @@ task.spawn(function()
     setupSpearAimbotBtn()
 end)
 
+task.spawn(function()
+    task.wait(3)
+    if VD.SelfHealButtonVisible then
+        pcall(SelfHeal_CreateButton)
+    end
+end)
+
 function UpdateMobileFOV()
     if not getgenv().MAWWW_MobileGui.FOVFrame then return end
     if VD.AIM_Enabled and VD.AIM_ShowFOV then
@@ -13229,7 +13677,7 @@ getgenv().MAWWW_SyncLoadedFeatures = function()
     if type(SetupNoPalletStun) == "function" then pcall(SetupNoPalletStun) end
     if type(VD_UpdateCrosshair) == "function" then pcall(VD_UpdateCrosshair) end
     
-    -- Sync ALFzxzzz Killer Display
+    -- Sync Next Killer Display
     if VD.VIS_ALFzxzzzKiller then
         pcall(StartALFzxzzzKiller)
     else
@@ -13295,6 +13743,13 @@ getgenv().MAWWW_SyncLoadedFeatures = function()
     -- Sync Dash Lock
     if VD.DashLockEnabled and not VD._DashLockActive then
         -- Dash lock will be activated by animation detection
+    end
+
+    -- Sync Teleport Forward
+    if VD.TeleportForward_Enabled then
+        pcall(TeleportForward_CreateButton)
+    else
+        pcall(TeleportForward_DestroyButton)
     end
 end
 
