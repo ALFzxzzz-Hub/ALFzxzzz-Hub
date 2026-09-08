@@ -33,7 +33,7 @@ if not ModernV2 then
         warn("[ALFzxzzzHub] Vercel mirror failed, trying GitHub fallback:", loaderResult)
         -- Fallback: GitHub raw (may be rate-limited)
         local fallbackOk, fallbackResult = pcall(function()
-            local source = game:HttpGet("https://raw.githubusercontent.comKys-lol/KysHubNewUI/refs/heads/main/MainV2.lua")
+            local source = game:HttpGet("https://raw.githubusercontent.com/Kys-lol/KysHubNewUI/refs/heads/main/MainV2.lua")
             local fn, compileErr = loadstring(source)
             if not fn then error(compileErr) end
             return fn()
@@ -3196,6 +3196,16 @@ end
 local function MAWWW_ToFStartConnection()
     if MAWWW_ToFState.Connection then return end
     MAWWW_ToFState.Connection = RunService.Heartbeat:Connect(function()
+        if VD.TOF_BlockKnocked ~= false then
+            local char = LocalPlayer.Character
+            if char and IsDowned(char) then
+                MAWWW_ToFState.IsAiming = false
+                if MAWWW_ToFState.TouchInput then MAWWW_ToFState.TouchInput = nil end
+                if MAWWW_ToFState.LaserBeam then MAWWW_ToFState.LaserBeam.Transparency = 1 end
+                return
+            end
+        end
+
         if not VD.TOF_SilentAim or not MAWWW_ToFState.IsAiming then
             if MAWWW_ToFState.LaserBeam then MAWWW_ToFState.LaserBeam.Transparency = 1 end
             return
@@ -3254,11 +3264,16 @@ local function MAWWW_ToFEnsureInputs()
             if not VD.TOF_SilentAim then return end
             if input.UserInputType == Enum.UserInputType.MouseButton1
             or (input.UserInputType == Enum.UserInputType.Touch and MAWWW_ToFIsTouchOnShootButton(input)) then
+                -- Hold = aim only. The actual shot is sent on release.
+                local char = LocalPlayer.Character
+                if VD.TOF_BlockKnocked ~= false and char and IsDowned(char) then
+                    MAWWW_ToFState.IsAiming = false
+                    return
+                end
                 MAWWW_ToFState.IsAiming = true
                 if input.UserInputType == Enum.UserInputType.Touch then
                     MAWWW_ToFState.TouchInput = input
                 end
-                MAWWW_ToFDoShoot()
                 return
             end
 
@@ -3277,9 +3292,19 @@ local function MAWWW_ToFEnsureInputs()
         MAWWW_ToFState.InputEnded = UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
             or (input.UserInputType == Enum.UserInputType.Touch and input == MAWWW_ToFState.TouchInput) then
+                local wasAiming = MAWWW_ToFState.IsAiming
                 MAWWW_ToFState.IsAiming = false
                 if input == MAWWW_ToFState.TouchInput then MAWWW_ToFState.TouchInput = nil end
                 if MAWWW_ToFState.LaserBeam then MAWWW_ToFState.LaserBeam.Transparency = 1 end
+
+                -- Release = fire once, unless the local player is knocked/dead.
+                if wasAiming then
+                    local char = LocalPlayer.Character
+                    if VD.TOF_BlockKnocked ~= false and char and IsDowned(char) then
+                        return
+                    end
+                    MAWWW_ToFDoShoot()
+                end
             end
         end)
     end
@@ -5338,7 +5363,7 @@ VeilConfig = {
     Enabled              = false,
     ShowFOV              = true,
     ShowTargetLaser      = true,
-    FOV                  = 150,
+    FOV                  = 220,
     SpearSpeed           = 165,
     Gravity              = workspace.Gravity * 0.5,
     MaxDist              = 200,
@@ -5392,9 +5417,10 @@ function Veil_GetRealVelocity(part, playerName)
     local cache = VeilVelocityCache[playerName]
     local dt = currentTime - cache.lastTime
     if dt > 0.01 then
+        dt = math.min(dt, 0.12)
         local rawVelocity = (currentPos - cache.lastPos) / dt
         if rawVelocity.Magnitude < 100 then
-            cache.velocity = cache.velocity:Lerp(rawVelocity, 0.4)
+            cache.velocity = cache.velocity:Lerp(rawVelocity, 0.35)
         end
     end
     cache.lastPos = currentPos
@@ -6431,10 +6457,11 @@ do -- Aim Tab
     end })
     spearSection:AddToggle({ Default = true, Name = "Show FOV Circle", Flag = "Show FOV Circle", Callback = function(v) VeilConfig.ShowFOV = v end })
     spearSection:AddToggle({ Default = true, Name = "Show Target Laser", Flag = "Show Target Laser", Callback = function(v) VeilConfig.ShowTargetLaser = v end })
-    spearSection:AddSlider({ Name = "FOV Radius", Flag = "FOV Radius", Min = 50, Max = 500, Default = 150, Callback = function(v) VeilConfig.FOV = v end })
+    spearSection:AddSlider({ Name = "FOV Radius", Flag = "FOV Radius", Min = 50, Max = 500, Default = 220, Callback = function(v) VeilConfig.FOV = v end })
     spearSection:AddToggle({ Default = false, Name = "Auto Predict", Flag = "Auto Predict", Callback = function(v) VeilConfig.AutoPredict = v end })
     spearSection:AddSlider({ Name = "Spear Speed", Flag = "Spear Speed", Min = 50, Max = 300, Default = 165, Callback = function(v) VeilConfig.SpearSpeed = v end })
     spearSection:AddSlider({ Name = "Gravity", Flag = "Gravity", Min = 0, Max = 300, Default = math.floor(workspace.Gravity * 0.5), Callback = function(v) VeilConfig.Gravity = v end })
+    spearSection:AddSlider({ Name = "Max Distance", Flag = "Veil Max Distance", Min = 50, Max = 200, Default = 200, Callback = function(v) VeilConfig.MaxDist = v end })
     spearSection:AddSlider({ Name = "Horizontal Vector", Flag = "Horizontal Vector", Min = 0, Max = 5, Default = 1.0, Decimals = 2, Callback = function(v) VeilConfig.HorizontalPredictFactor = v end })
     spearSection:AddDropdown({ Name = "Target Part", Flag = "Target Part", Values = {"Torso", "Head", "Root"}, Default = "Torso", Multi = false, Callback = function(v)
         if type(v) == "table" then v = v[1] end
