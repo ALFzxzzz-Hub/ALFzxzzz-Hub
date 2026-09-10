@@ -378,6 +378,8 @@ getgenv().VD = getgenv().VD or {
     VIS_HideSurvivorIcon  = false,
     VIS_ShowPingFPS       = false,
     VIS_ShowHookCounter   = false,
+    PredictSpear           = false,
+    PredictHidden          = false,
     VIS_WeatherTheme      = "Default",
     CROSS_Enabled         = false,
     CROSS_Style           = "Dot",
@@ -613,6 +615,8 @@ local VD_DefaultOffFlags = {
     "VIS_HideSurvivorIcon",
     "VIS_ShowPingFPS",
     "VIS_ShowHookCounter",
+    "PredictSpear",
+    "PredictHidden",
     "CROSS_Enabled",
     "CROSS_Style",
     "CROSS_Size",
@@ -826,6 +830,8 @@ local VD_To_Flag = {
     VIS_HideSurvivorIcon = "Hide Survivor Icon",
     VIS_ShowPingFPS = "Show Ping & FPS",
     VIS_ShowHookCounter = "Show Hook Counter",
+    PredictSpear = "Predict Spear",
+    PredictHidden = "Predict Hidden",
     DashLockEnabled = "Dash Lock",
     DashLockDuration = "Dash Lock Duration",
     DashLockSmoothness = "Dash Lock Smoothness",
@@ -6772,6 +6778,21 @@ do -- FOV Tab
         LocalPlayer.CameraMaxZoomDistance = v and math.huge or 128 
         LocalPlayer.CameraMinZoomDistance = v and 0 or 0.5 
     end })
+    camSection:AddToggle({
+        Default = false, Name = "Predict Spear", Flag = "Predict Spear",
+        Callback = function(v)
+            VD.PredictSpear = v and true or false
+            if not v then pcall(ClearPredictSpear) end
+        end
+    })
+    camSection:AddToggle({
+        Default = false, Name = "Predict Hidden", Flag = "Predict Hidden",
+        Callback = function(v)
+            VD.PredictHidden = v and true or false
+            if not v then pcall(ClearPredictHidden) end
+        end
+    })
+
     camSection:AddToggle({ Default = false, Name = "No Cutscene", Flag = "No Cutscene", Callback = function(v) VD.NoCutscene = v end })
 
     -- removed FOVTab AddDivider
@@ -13448,6 +13469,107 @@ task.spawn(MAWWW_SetupNoCutsceneListeners)
 -- =====================================================
 -- RENDERSTEP: Drawing ESP / Aimbot / Camera
 -- =====================================================
+-- =====================================================
+-- PREDICT SPEAR + PREDICT HIDDEN
+-- Controlled by Visuals > Camera. No standalone UI.
+-- =====================================================
+local PredictSpearParts = {}
+local PredictHiddenParts = {}
+
+local PredictSpearAnimations = {
+    ["92098503722633"] = true,
+    ["138045669415653"] = true,
+    ["84093948968516"] = true,
+}
+local PredictHiddenAnimations = {
+    ["98163597193511"] = true,
+}
+
+local function PredictGetAnimationId(track)
+    if not track or not track.Animation then return nil end
+    return tostring(track.Animation.AnimationId):match("%d+")
+end
+
+local function PredictIsPlaying(character, animations)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then return false end
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+        local id = PredictGetAnimationId(track)
+        if id and animations[id] then return true end
+    end
+    return false
+end
+
+local function PredictCreatePart(player, parts, name, length)
+    if parts[player] and parts[player].Parent then return parts[player] end
+    local part = Instance.new("Part")
+    part.Name = name
+    part.Shape = Enum.PartType.Block
+    part.Size = Vector3.new(0.4, 0.4, length)
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.CastShadow = false
+    part.Material = Enum.Material.Neon
+    part.Transparency = 0.22
+    part.Color = Color3.fromRGB(255, 255, 255)
+    part.Parent = workspace
+    parts[player] = part
+    return part
+end
+
+local function PredictRemovePart(player, parts)
+    local part = parts[player]
+    if part then pcall(function() part:Destroy() end); parts[player] = nil end
+end
+
+local function PredictClear(parts)
+    for player, part in pairs(parts) do
+        if part then pcall(function() part:Destroy() end) end
+        parts[player] = nil
+    end
+end
+
+local function PredictUpdate(enabled, animations, parts, name, length, offsetDepan)
+    if not enabled then PredictClear(parts); return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if not character or not root then
+            PredictRemovePart(player, parts)
+            continue
+        end
+        if PredictIsPlaying(character, animations) then
+            local part = PredictCreatePart(player, parts, name, length)
+            local pos = root.Position + Vector3.new(0, -0.8, 0) + root.CFrame.LookVector * offsetDepan
+            part.CFrame = CFrame.lookAt(pos, pos + root.CFrame.LookVector)
+        else
+            PredictRemovePart(player, parts)
+        end
+    end
+end
+
+local function UpdatePredictSpear()
+    PredictUpdate(VD.PredictSpear, PredictSpearAnimations, PredictSpearParts, "ALFzxzzz_PredictSpear", 82, 42)
+end
+
+local function UpdatePredictHidden()
+    PredictUpdate(VD.PredictHidden, PredictHiddenAnimations, PredictHiddenParts, "ALFzxzzz_PredictHidden", 42, 24)
+end
+
+local function ClearPredictSpear() PredictClear(PredictSpearParts) end
+local function ClearPredictHidden() PredictClear(PredictHiddenParts) end
+getgenv().MAWWW_ClearPredictSpear = ClearPredictSpear
+getgenv().MAWWW_ClearPredictHidden = ClearPredictHidden
+
+Players.PlayerRemoving:Connect(function(player)
+    PredictRemovePart(player, PredictSpearParts)
+    PredictRemovePart(player, PredictHiddenParts)
+end)
+
 function OnRenderStep()
     if VD.Destroyed then
         if DrawingAvailable then
@@ -13470,6 +13592,8 @@ function OnRenderStep()
     end)
 
     pcall(UpdateSpearAim)
+    pcall(UpdatePredictSpear)
+    pcall(UpdatePredictHidden)
     UpdateCameraFOV()
     UpdateThirdPerson()
     UpdateShiftLock()
@@ -13799,6 +13923,8 @@ RunService.Heartbeat:Connect(function(deltaTime)
         UpdateThirdPerson()
         UpdateShiftLock()
         pcall(UpdateSpearAim)
+        pcall(UpdatePredictSpear)
+        pcall(UpdatePredictHidden)
     end
     if not DrawingAvailable and VD.AIM_Enabled and State.AimHolding then
         local sc = cam.ViewportSize
