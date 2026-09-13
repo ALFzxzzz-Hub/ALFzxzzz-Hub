@@ -1,11 +1,12 @@
 --[[
 ============================================================
-  WISNU HUB - Multi Feature
-  File 1/4 : Core + Parry + Killer (Part A)
+  WISNU HUB - Multi Feature (MERGED + MISC + AUTO ATTACK)
+  Premium Structure + Old Best Features
+  FIXED: Auto Skill Check (Legit + Instant)
 ============================================================
 --]]
 
--- LOAD LIB
+-- ==================== LOAD LIB ====================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
@@ -23,22 +24,24 @@ Library.Scheme.MainColor = Color3.fromRGB(15, 15, 15)
 Library.Scheme.OutlineColor = Color3.fromRGB(255, 0, 0)
 Library.Scheme.FontColor = Color3.fromRGB(255, 255, 255)
 
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
-local Workspace      = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting       = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
+-- SERVICES
+local Players            = game:GetService("Players")
+local RunService         = game:GetService("RunService")
+local Workspace          = game:GetService("Workspace")
+local ReplicatedStorage  = game:GetService("ReplicatedStorage")
+local Lighting           = game:GetService("Lighting")
+local UserInputService   = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local Stats          = game:GetService("Stats")
-local TweenService   = game:GetService("TweenService")
+local Stats              = game:GetService("Stats")
+local TweenService       = game:GetService("TweenService")
+local GuiService         = game:GetService("GuiService")
 
-local LocalPlayer  = Players.LocalPlayer
-local PlayerGui    = LocalPlayer:WaitForChild("PlayerGui")
-local Camera       = workspace.CurrentCamera
-local isMobile = UserInputService.TouchEnabled
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+local Camera      = workspace.CurrentCamera
+local isMobile    = UserInputService.TouchEnabled
 
--- GLOBAL EXPOSE
+-- ==================== GLOBAL EXPOSE ====================
 _G.Wisnu = _G.Wisnu or {}
 local W = _G.Wisnu
 
@@ -53,6 +56,7 @@ W.ReplicatedStorage = ReplicatedStorage
 W.Lighting = Lighting
 W.UserInputService = UserInputService
 W.VirtualInputManager = VirtualInputManager
+W.GuiService = GuiService
 W.LocalPlayer = LocalPlayer
 W.PlayerGui = PlayerGui
 W.Camera = Camera
@@ -70,6 +74,7 @@ W.VD = {
     SURV_FirstPerson = false,
     SURV_WalkSpeedEnabled = false, SURV_WalkSpeedValue = 16,
     SURV_JumpPowerEnabled = false, SURV_JumpPowerValue = 50,
+    AUTO_Attack = false, AUTO_AttackRange = 20,
 }
 local VD = W.VD
 
@@ -101,37 +106,29 @@ local GetRole = W.GetRole
 W.PlayerMods = { AntiFall = false, GodMode = false }
 local PlayerMods = W.PlayerMods
 
--- INSTANT HEAL CONFIG
 W.InstantHealSelf = false
 W.AutoHealAll = false
 W.InstantHealConnection = nil
 W.AutoHealAllConnection = nil
 
-W.SelfHealButton = { UI=nil, Button=nil, Stroke=nil, Dragging=false, DragStart=nil, DragStartPos=nil }
-W.SelfHealButtonDragLocked = false
-
--- FAKE PERKS CONFIG
 W.FP = {
     Conns = {}, ActiveBuffs = {}, HB = nil, LastBuffEnd = 0, CooldownTime = 10,
     FlowstateOn = false, QuickRecOn = false, PerfLandOn = false, AdrenalineOn = false,
 }
 
--- AUTO STALK
 W.AutoStalk = { Enabled = false, StalkRange = 150, Target = nil }
 
--- AUTO
 W.Auto = {
-    SkillCheck = false, SkillCheckMode = "Legit", PalletDrop = false, PalletDropDist = 6,
+    SkillCheck = false, SkillCheckMode = "Legit",
+    PalletDrop = false, PalletDropDist = 6,
     Flee = false, FleeDist = 50, FleeCooldown = 0.1,
 }
 
--- GEN BYPASS
 W.GenBypass = {
     Enabled = false, Button = nil, UI = nil, Cache = {}, CacheTimer = 0, Processed = {},
     HotkeyCode = Enum.KeyCode.G, TriggerRange = 8,
 }
 
--- ESP CONFIG
 W.ESP = { Survivor=false, Killer=false, Generator=false, Pallet=false, Window=false, SCP=false, Distance=100 }
 W.ESPStatus = { Enabled=false, ShowName=true, ShowDistance=true, ShowHealth=false, ShowItem=true, Radius=100 }
 W.ESPItems = { ["Twist of Fate"]=true, ["Bandage"]=true, ["Motion Tracker"]=true, ["Gate"]=true, ["Shadow Clone"]=true, ["Parrying Dagger"]=true }
@@ -154,6 +151,7 @@ W.Config = {
 }
 W.State = {
     ParryCooldown = false, ParryCooldownTime = 60, AutoParryAdornment = nil,
+    ParryCooldownThread = nil,
     lastParry = 0, busy = false, UsedPallets = {}, LastFlee = 0,
 }
 W.Timers = { lastESPUpdate = 0, lastPalletScan = 0, lastPalletDrop = 0, lastVaultBlock = 0 }
@@ -178,6 +176,9 @@ W.VALID_PARRY_IDS = {
 local VALID_PARRY_IDS = W.VALID_PARRY_IDS
 local Attached = {}
 W.Attached = Attached
+
+local PARRY_DEBOUNCE = 0.2
+local lastParryTime = 0
 
 function W.IsSafeToParry(char)
     if not Config.Surv_ParrySafety then return true end
@@ -251,6 +252,9 @@ end
 
 function W.ExecuteParry()
     if State.ParryCooldown then return end
+    local now = tick()
+    if now - lastParryTime < PARRY_DEBOUNCE then return end
+    lastParryTime = now
     pcall(function()
         local pr = ReplicatedStorage:FindFirstChild("Remotes")
             and ReplicatedStorage.Remotes:FindFirstChild("Items")
@@ -262,6 +266,25 @@ function W.ExecuteParry()
 end
 local ExecuteParry = W.ExecuteParry
 
+function W.ListenToParryResult()
+    task.spawn(function()
+        local remotes = ReplicatedStorage:WaitForChild("Remotes", 5)
+        local dagger = remotes and remotes:WaitForChild("Items", 5):WaitForChild("Parrying Dagger", 5)
+        local parryResultRemote = dagger and dagger:WaitForChild("parryResult", 5)
+        if parryResultRemote then
+            parryResultRemote.OnClientEvent:Connect(function(arg1, arg2)
+                local cdDur = tonumber(arg2) or ((arg1 == true) and 90 or 60)
+                State.ParryCooldown = true
+                if State.ParryCooldownThread then task.cancel(State.ParryCooldownThread) end
+                State.ParryCooldownThread = task.delay(cdDur, function()
+                    State.ParryCooldown = false
+                end)
+            end)
+        end
+    end)
+end
+W.ListenToParryResult()
+
 function W.AttachParrySensor(kChar)
     if not kChar or Attached[kChar] then return end
     Attached[kChar] = true
@@ -269,20 +292,17 @@ function W.AttachParrySensor(kChar)
     if not hum then return end
     local anim = hum:FindFirstChildOfClass("Animator") or hum:WaitForChild("Animator",5)
     if not anim then return end
-
     hum.ChildAdded:Connect(function(c)
         if c:IsA("Animator") then Attached[kChar]=nil; W.AttachParrySensor(kChar) end
     end)
     kChar.AncestryChanged:Connect(function(_,p)
         if not p then Attached[kChar]=nil end
     end)
-
     anim.AnimationPlayed:Connect(function(track)
         local animId = track.Animation and track.Animation.AnimationId or ""
         local id = animId:match("%d+")
         local name = VALID_PARRY_IDS[id]
         if not name then return end
-
         if id=="80411309607666" and Config.Surv_AutoCrouch then
             local mc = LocalPlayer.Character
             if IsDowned(mc) then return end
@@ -294,17 +314,14 @@ function W.AttachParrySensor(kChar)
             end
             return
         end
-
         if not Config.Surv_AutoParry then return end
         if State.ParryCooldown then return end
         if Config.Ignored_Skills_List[name] then return end
-
         local mc = LocalPlayer.Character
         if IsDowned(mc) or not IsSafeToParry(mc) then return end
         local mh = mc and mc:FindFirstChild("HumanoidRootPart")
         local kh = kChar:FindFirstChild("HumanoidRootPart")
         if not mh or not kh then return end
-
         local startDist = (mh.Position - kh.Position).Magnitude
         if Config.Surv_ParryAggressive then
             local ar = 12
@@ -351,7 +368,6 @@ function W.SetupPlayer(p)
     if p.Character then W.TryAttach(p) end
 end
 
--- HELPERS
 function W.GetRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
@@ -387,7 +403,6 @@ function W.GetFarthestGeneratorPoint(kRoot)
 end
 local GetFarthestGeneratorPoint = W.GetFarthestGeneratorPoint
 
--- ANTI FALL DAMAGE
 function W.SetupAntiFallDamage()
     pcall(function()
         local r = ReplicatedStorage:FindFirstChild("Remotes")
@@ -413,7 +428,6 @@ function W.SetupAntiFallDamage()
 end
 W.SetupAntiFallDamage()
 
--- NO SLOWDOWN
 function W.UpdateNoSlowdown()
     if not VD.KILLER_NoSlowdown or GetRole() ~= "Killer" then return end
     local c = LocalPlayer.Character
@@ -453,7 +467,6 @@ function W.SetupAntiStunSlowdown()
 end
 task.spawn(W.SetupAntiStunSlowdown)
 
--- AUTO HOOK
 W.MAWWW_Cache = W.MAWWW_Cache or { Hooks = {} }
 local function MAWWW_ScanHooks()
     local hooks = {}
@@ -477,7 +490,6 @@ function W.MAWWW_AutoHook()
     local char = LocalPlayer.Character
     local carry = false
     if char then carry = char:GetAttribute("IsCarrying") or char:GetAttribute("isCarrying") end
-
     if carry then
         local occ = {}
         for _,v in ipairs(Players:GetPlayers()) do
@@ -519,7 +531,6 @@ function W.MAWWW_AutoHook()
         end
         return
     end
-
     local closest, cdist = nil, math.huge
     for _, player in ipairs(Players:GetPlayers()) do
         if player~=LocalPlayer and IsSurvivor(player) and player.Character then
@@ -596,11 +607,32 @@ function W.MAWWW_AutoHook()
 end
 local MAWWW_AutoHook = W.MAWWW_AutoHook
 
--- PLACEHOLDER FUNCS (implemented in file 2/3)
-W.Placeholder = {}
+function W.MAWWW_AutoAttack()
+    if not VD.AUTO_Attack or GetRole() ~= "Killer" then return end
+    local root = GetRoot()
+    if not root then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsSurvivor(player) and player.Character then
+            local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            local tHum = player.Character:FindFirstChildOfClass("Humanoid")
+            if tRoot and tHum and tHum.MaxHealth > 0 then
+                local pct = tHum.Health / tHum.MaxHealth
+                if pct > 0.25 and (tRoot.Position - root.Position).Magnitude <= VD.AUTO_AttackRange then
+                    pcall(function()
+                        local r = ReplicatedStorage:FindFirstChild("Remotes")
+                        local a = r and r:FindFirstChild("Attacks")
+                        local b = a and a:FindFirstChild("BasicAttack")
+                        if b then b:FireServer(false) end
+                    end)
+                    break
+                end
+            end
+        end
+    end
+end
+local MAWWW_AutoAttack = W.MAWWW_AutoAttack
 
 print("[Wisnu Hub] File 1/4 loaded ✓")
--- PART 1 END
 
 --[[
 ============================================================
@@ -608,21 +640,6 @@ print("[Wisnu Hub] File 1/4 loaded ✓")
 ============================================================
 --]]
 
-local W = _G.Wisnu
-if not W then warn("[Wisnu Hub] File 1 harus dijalankan dulu!") return end
-
-local Players = W.Players
-local RunService = W.RunService
-local ReplicatedStorage = W.ReplicatedStorage
-local LocalPlayer = W.LocalPlayer
-local Library = W.Library
-local VD = W.VD
-local VD_Notify = W.VD_Notify
-local GetRole = W.GetRole
-local GetRoot = W.GetRoot
-local IsSurvivor = W.IsSurvivor
-
--- BYPASS COOLDOWN HIDDEN
 getgenv().MAWWW_HiddenLeapBypassThread = nil
 function MAWWW_StartHiddenCooldownBypass()
     if getgenv().MAWWW_HiddenLeapBypassThread then return end
@@ -668,7 +685,6 @@ W.MAWWW_StartHiddenCooldownBypass = MAWWW_StartHiddenCooldownBypass
 function MAWWW_StopHiddenCooldownBypass() end
 W.MAWWW_StopHiddenCooldownBypass = MAWWW_StopHiddenCooldownBypass
 
--- BYPASS JEFF
 getgenv().MAWWW_JeffCooldownBypassThread = nil
 function MAWWW_StartJeffCooldownBypass()
     if getgenv().MAWWW_JeffCooldownBypassThread then return end
@@ -676,8 +692,7 @@ function MAWWW_StartJeffCooldownBypass()
         while task.wait() do
             if not VD.KILLER_InfFrenzy then break end
             pcall(function()
-                local c = LocalPlayer.Character
-                if c and c:GetAttribute("Frenzy") ~= true then c:SetAttribute("Frenzy", true) end
+                local c = LocalPlayer.Character                if c and c:GetAttribute("Frenzy") ~= true then c:SetAttribute("Frenzy", true) end
             end)
         end
         getgenv().MAWWW_JeffCooldownBypassThread = nil
@@ -701,7 +716,6 @@ function MAWWW_StopJeffCooldownBypass()
 end
 W.MAWWW_StopJeffCooldownBypass = MAWWW_StopJeffCooldownBypass
 
--- BYPASS ABYSS
 getgenv().MAWWW_AbyssCooldownBypassConnection = nil
 getgenv().MAWWW_CorruptHandlerFunc = nil
 function MAWWW_StartAbyssCooldownBypass()
@@ -737,7 +751,6 @@ function MAWWW_StopAbyssCooldownBypass()
 end
 W.MAWWW_StopAbyssCooldownBypass = MAWWW_StopAbyssCooldownBypass
 
--- BYPASS SLASHER
 getgenv().MAWWW_SlasherCooldownBypassThread = nil
 function MAWWW_StartSlasherCooldownBypass()
     if getgenv().MAWWW_SlasherCooldownBypassThread then return end
@@ -806,7 +819,6 @@ function MAWWW_StopSlasherCooldownBypass()
 end
 W.MAWWW_StopSlasherCooldownBypass = MAWWW_StopSlasherCooldownBypass
 
--- ANTI BLIND
 function W.SetupAntiBlind()
     pcall(function()
         local r = ReplicatedStorage:FindFirstChild("Remotes")
@@ -833,7 +845,6 @@ function W.SetupAntiBlind()
 end
 W.SetupAntiBlind()
 
--- BLOCK ALL VAULTS
 function W.HandleBlockVaults()
     if not VD.KILLER_BlockVaults then return end
     if GetRole() ~= "Killer" then return end
@@ -860,7 +871,6 @@ function W.HandleBlockVaults()
 end
 local HandleBlockVaults = W.HandleBlockVaults
 
--- AUTO STALK
 function W.getClosestSurvivorForStalk()
     local root = GetRoot()
     if not root then return nil end
@@ -895,13 +905,11 @@ function W.stopAutoStalk()
     if W.Connections.Stalk then W.Connections.Stalk:Disconnect(); W.Connections.Stalk = nil end
 end
 
--- BEAT GAME KILLER
 function W.MAWWW_BeatGameKiller()
     if not VD.BEAT_Killer then VD._KillerTarget = nil; return end
     if GetRole() ~= "Killer" then VD._KillerTarget = nil; return end
     local root = GetRoot()
     if not root then return end
-
     local target = VD._KillerTarget
     local need = true
     if target and target.Character then
@@ -913,7 +921,6 @@ function W.MAWWW_BeatGameKiller()
             VD._KillerTarget = nil
         end
     end
-
     if need then
         local survs = {}
         for _,p in ipairs(Players:GetPlayers()) do
@@ -936,21 +943,17 @@ function W.MAWWW_BeatGameKiller()
             VD._KillerTarget = nil; return
         end
     end
-
     if not target or not target.Character then return end
     local tr = target.Character:FindFirstChild("HumanoidRootPart")
     local th = target.Character:FindFirstChildOfClass("Humanoid")
     if not tr or not th then VD._KillerTarget=nil; return end
     if th.MaxHealth<=0 or (th.Health/th.MaxHealth)<=0.25 then VD._KillerTarget=nil; return end
-
     for _,part in ipairs(LocalPlayer.Character:GetDescendants()) do
         if part:IsA("BasePart") then pcall(function() part.CanCollide=false end) end
     end
-
     local dir = (root.Position - tr.Position).Unit
     if dir.Magnitude ~= dir.Magnitude then dir = Vector3.new(1,0,0) end
     root.CFrame = CFrame.new(tr.Position + dir*3 + Vector3.new(0,1,0), tr.Position)
-
     pcall(function()
         local r = ReplicatedStorage:FindFirstChild("Remotes")
         local a = r and r:FindFirstChild("Attacks")
@@ -960,7 +963,6 @@ function W.MAWWW_BeatGameKiller()
 end
 local MAWWW_BeatGameKiller = W.MAWWW_BeatGameKiller
 
--- FAKE ATTACK (Counter Auto Parry)
 getgenv().MAWWW_FakeAttackThread = nil
 function W.MAWWW_ToggleFakeAttack(enabled)
     if not enabled then
@@ -1004,7 +1006,6 @@ function W.MAWWW_ToggleFakeAttack(enabled)
 end
 local MAWWW_ToggleFakeAttack = W.MAWWW_ToggleFakeAttack
 
--- HEAL LOGIC
 function W.doSelfHealTrue()
     local c = LocalPlayer.Character
     if not c then return end
@@ -1094,7 +1095,6 @@ function W.setAutoHealAll(v)
 end
 
 print("[Wisnu Hub] File 2/4 loaded ✓")
--- PART 2 END
 
 --[[
 ============================================================
@@ -1102,23 +1102,6 @@ print("[Wisnu Hub] File 2/4 loaded ✓")
 ============================================================
 --]]
 
-local W = _G.Wisnu
-if not W then warn("[Wisnu Hub] File 1 harus dijalankan dulu!") return end
-
-local Players = W.Players
-local RunService = W.RunService
-local ReplicatedStorage = W.ReplicatedStorage
-local LocalPlayer = W.LocalPlayer
-local UserInputService = W.UserInputService
-local VD = W.VD
-local VD_Notify = W.VD_Notify
-local GetRoot = W.GetRoot
-local GetNearestKiller = W.GetNearestKiller
-local GetFarthestGeneratorPoint = W.GetFarthestGeneratorPoint
-local isMobile = W.isMobile
-local ESPCache = W.ESPCache
-
--- FAKE PERKS CORE
 local FP = W.FP
 local function FP_Char() return LocalPlayer.Character end
 local function FP_Hum() local c = FP_Char(); return c and c:FindFirstChildOfClass("Humanoid") end
@@ -1132,8 +1115,9 @@ local function FP_GetTotal()
 end
 
 local function FP_Apply()
-    local c, h = FP_Char(), FP_Hum()
+    local c = FP_Char()
     local tb = FP_GetTotal()
+    local h = FP_Hum()
     if c then
         if tb > 0 then c:SetAttribute("speedboost", 1+(tb/14))
         else c:SetAttribute("speedboost", 1) end
@@ -1311,7 +1295,6 @@ function W.FP_SetupAdrenalineRush(val)
     end
 end
 
--- FIRST PERSON
 getgenv().MAWWW_fpWasSet = false
 getgenv().MAWWW_fpOriginal = nil
 
@@ -1374,7 +1357,6 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
--- WALKSPEED & JUMPPOWER
 W.KillerAnims = {
     ["rbxassetid://105374834496520"]=true, ["rbxassetid://113255068724446"]=true,
     ["rbxassetid://118907603246885"]=true, ["rbxassetid://129784271201071"]=true,
@@ -1444,7 +1426,6 @@ function W.applyWalkSpeed()
 end
 local applyWalkSpeed = W.applyWalkSpeed
 
--- AUTO DROP PALLET
 function W.HandleAutoPallet()
     if not W.Auto.PalletDrop then return end
     local plr = Players.LocalPlayer
@@ -1490,7 +1471,6 @@ function W.HandleAutoPallet()
 end
 local HandleAutoPallet = W.HandleAutoPallet
 
--- AUTO FLEE
 task.spawn(function()
     while task.wait(0.2) do
         if not W.Auto.Flee then continue end
@@ -1507,7 +1487,6 @@ task.spawn(function()
     end
 end)
 
--- GEN BYPASS
 local GenBypass = W.GenBypass
 
 function W.GB_GetAllGenerators()
@@ -1554,7 +1533,7 @@ function W.GB_DoRepair(tp)
     local c = LocalPlayer.Character
     local hrp = c and c:FindFirstChild("HumanoidRootPart")
     if not hrp then GenBypass.Processed[gm]=nil; return end
-    local re = ReplicatedStorage:FindFirstChild("Remotes") 
+    local re = ReplicatedStorage:FindFirstChild("Remotes")
         and ReplicatedStorage.Remotes:FindFirstChild("Generator")
         and ReplicatedStorage.Remotes.Generator:FindFirstChild("RepairEvent")
     local og = hrp.CFrame
@@ -1682,33 +1661,13 @@ function W.setGenBypass(v)
 end
 
 print("[Wisnu Hub] File 3/4 loaded ✓")
--- PART 3 END
 
 --[[
 ============================================================
   WISNU HUB - File 4/4 : Aim, Visuals, ESP, UI, Main Loop
+  FIXED: Auto Skill Check (Legit + Instant)
 ============================================================
 --]]
-
-local W = _G.Wisnu
-if not W then warn("[Wisnu Hub] File 1 harus dijalankan dulu!") return end
-
-local Library = W.Library
-local ThemeManager = W.ThemeManager
-local SaveManager = W.SaveManager
-local Options = W.Library.Options
-local Players = W.Players
-local RunService = W.RunService
-local ReplicatedStorage = W.ReplicatedStorage
-local LocalPlayer = W.LocalPlayer
-local UserInputService = W.UserInputService
-local VD = W.VD
-local VD_Notify = W.VD_Notify
-local GetRole = W.GetRole
-local GetRoot = W.GetRoot
-local IsSurvivor = W.IsSurvivor
-local isMobile = W.isMobile
-local GetSafeGuiParent = W.GetSafeGuiParent
 
 -- ToF SILENT AIM
 local ToFState = {
@@ -2239,16 +2198,6 @@ function W.Flash_SetSilentAim(en)
 end
 local Flash_SetSilentAim = W.Flash_SetSilentAim
 
-getgenv().MAWWW_SetFlashlightSilentAim = Flash_SetSilentAim
-getgenv().MAWWW_ClearFlashlightLaser = W.Flash_ClearLaser
-getgenv().MAWWW_SetFlashlightAimActive = function(active, part)
-    FlashState.Active = active and true or false
-    if FlashState.Active and part then FlashState.FlashlightPart = part
-    elseif not FlashState.Active then FlashState.FlashlightPart = nil end
-    if not FlashState.Active and FlashState.LaserBeam then FlashState.LaserBeam.Transparency=1 end
-end
-getgenv().MAWWW_FlashlightActivateRemote = Flash_GetActivateRemote()
-
 -- VEIL SPEAR
 local VeilConfig = { Enabled=false, ShowFOV=true, ShowTargetLaser=true, FOV=220, SpearSpeed=165, Gravity=workspace.Gravity*0.5, MaxDist=200, AutoPredict=false, TargetPart="Torso", HorizontalPredictFactor=1.0 }
 local VeilState = { chargingSpear=false, touchInput=nil, attackCooldown=false, passiveCooldown=false, remoteHooked=false, lastPredictedPos=nil }
@@ -2483,7 +2432,6 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- DASH LOCK
-local DashLock = { Enabled=false }
 local function DashLockUpdate()
     if not VD.DashLockEnabled then
         if VD._DashLockActive then
@@ -2797,7 +2745,7 @@ RunService.RenderStepped:Connect(function()
     USCP(r)
 end)
 
--- UI
+-- ==================== WINDOW & TABS ====================
 local Window = Library:CreateWindow({
     Title = "Wisnu Hub",
     Footer = 'Violence District | Multi-Feature',
@@ -2817,17 +2765,16 @@ local Tabs = {
     Killer = Window:AddTab("Killer", "skull", "Killer Utilities"),
     Visuals = Window:AddTab("Visuals", "eye", "Camera & Visual Features"),
     Survivor = Window:AddTab("Survivor", "user", "Survivor Utilities"),
+    Misc = Window:AddTab("Misc", "sparkles", "Extra Scripts & Fun"),
     UISettings = Window:AddTab("UI Settings", "settings-2", "Config, Theme, UiSetting"),
 }
 
--- COMBAT TAB
+-- ==================== COMBAT TAB ====================
 local CombatLeft = Tabs.Combat:AddLeftGroupbox("Auto Parry", "swords")
 local CombatRight = Tabs.Combat:AddRightGroupbox("Silent Aim ToF", "target")
 local CombatFlashBox = Tabs.Combat:AddLeftGroupbox("Silent Aim Flashlight", "flashlight")
 local CombatVeilBox = Tabs.Combat:AddRightGroupbox("Silent Aim Spear (Veil)", "sword")
 local CombatDashBox = Tabs.Combat:AddLeftGroupbox("Dash Lock (Killer)", "zap")
-
-local Config = W.Config
 
 CombatLeft:AddCheckbox("AutoParry", {
     Text = "Auto Parry", Default = false,
@@ -2894,7 +2841,6 @@ CombatVeilBox:AddToggle("VeilAutoPredict", { Text = "Auto Prediction", Default =
 CombatVeilBox:AddSlider("VeilPredictFactor", { Text = "Horizontal Predict", Default = 1.0, Min = 0, Max = 3, Rounding = 1, Callback = function(v) VeilConfig.HorizontalPredictFactor = v end })
 CombatVeilBox:AddToggle("VeilShowFOV", { Text = "Show FOV Circle", Default = true, Callback = function(v) VeilConfig.ShowFOV = v end })
 CombatVeilBox:AddToggle("VeilShowLaser", { Text = "Show Target Laser", Default = true, Callback = function(v) VeilConfig.ShowTargetLaser = v end })
-CombatVeilBox:AddToggle("VeilShowTracer", { Text = "Show Prediction Tracer", Default = true, Callback = function(v) end })
 
 CombatDashBox:AddCheckbox("DashLockEnabled", {
     Text = "Enable Dash Lock", Default = false,
@@ -2914,7 +2860,7 @@ CombatDashBox:AddToggle("DashLockFreeze", { Text = "Freeze Movement During Lock"
     end
 end })
 
--- KILLER TAB
+-- ==================== KILLER TAB ====================
 local KillerAbilityBox = Tabs.Killer:AddLeftGroupbox("Ability Killer", "shield")
 local KillerInfoBox = Tabs.Killer:AddRightGroupbox("Info", "info")
 
@@ -2929,6 +2875,24 @@ KillerAbilityBox:AddCheckbox("AutoHook", {
     Text = "Auto Hook", Default = false,
     Callback = function(v) VD.KILLER_AutoHook = v; VD_Notify("Auto Hook", v and "Enabled" or "Disabled", 2) end,
 }):AddKeyPicker("AutoHookKey", { Default="None", Text="Toggle Key", Mode="Toggle", Callback=function(s) VD.KILLER_AutoHook = s end })
+KillerAbilityBox:AddDivider()
+
+KillerAbilityBox:AddCheckbox("AutoAttack", {
+    Text = "Auto Attack", Default = false,
+    Tooltip = "Otomatis attack survivor dalam radius (skip kalau HP < 25%)",
+    Callback = function(v)
+        VD.AUTO_Attack = v
+        VD_Notify("Auto Attack", v and "Enabled" or "Disabled", 2)
+    end,
+}):AddKeyPicker("AutoAttackKey", {
+    Default="None", Text="Toggle Key", Mode="Toggle",
+    Callback=function(s) VD.AUTO_Attack = s end
+})
+KillerAbilityBox:AddSlider("AutoAttackRange", {
+    Text = "Attack Range",
+    Default = 20, Min = 5, Max = 100, Rounding = 0,
+    Callback = function(v) VD.AUTO_AttackRange = v end
+})
 KillerAbilityBox:AddDivider()
 
 KillerAbilityBox:AddCheckbox("BypassCooldownAbyss", {
@@ -2990,9 +2954,9 @@ KillerAbilityBox:AddCheckbox("FakeAttack", {
     Callback = function(v) VD.KILLER_FakeAttack = v; W.MAWWW_ToggleFakeAttack(v) end,
 }):AddKeyPicker("FakeAttackKey", { Default="None", Text="Toggle Key", Mode="Toggle", Callback=function(s) VD.KILLER_FakeAttack=s; W.MAWWW_ToggleFakeAttack(s) end })
 
-KillerInfoBox:AddLabel("Fitur Killer:\n- No Slowdown\n- Auto Hook\n- Bypass (Abyss/Hidden/Jeff/Slasher)\n- Anti Blind\n- Block All Vaults\n- Auto Stalk\n- Auto Kill All\n- Counter Auto Parry")
+KillerInfoBox:AddLabel("Fitur Killer:\n- No Slowdown\n- Auto Hook\n- Auto Attack\n- Bypass (Abyss/Hidden/Jeff/Slasher)\n- Anti Blind\n- Block All Vaults\n- Auto Stalk\n- Auto Kill All\n- Counter Auto Parry")
 
--- VISUALS TAB
+-- ==================== VISUALS TAB ====================
 local VisualLockPOVBox = Tabs.Visuals:AddLeftGroupbox("Lock POV (FOV)", "eye")
 local VisualESPBox = Tabs.Visuals:AddRightGroupbox("ESP Cham", "scan-eye")
 local VisualESPStatusBox = Tabs.Visuals:AddLeftGroupbox("ESP Status", "scan-eye")
@@ -3034,48 +2998,122 @@ VisualESPStatusBox:AddSlider("StatusRadius", { Text = "Status Radius", Default =
 
 VisualMorphBox:AddButton({ Text = "Apply Korless", Func = function() W.ApplyKorless(); VD_Notify("Morph Avatar", "Korless Applied", 2) end })
 
--- SURVIVOR TAB
+-- ==================== SURVIVOR TAB ====================
 local SurvSkillBox = Tabs.Survivor:AddLeftGroupbox("Auto Skill Check", "check-circle")
 local SurvGenBox = Tabs.Survivor:AddRightGroupbox("Bypass Generator", "zap")
 local SurvAbilitiesBox = Tabs.Survivor:AddLeftGroupbox("Abilities", "shield")
 local SurvFakePerksBox = Tabs.Survivor:AddRightGroupbox("Fake Perks", "star")
+
+-- ============ AUTO SKILL CHECK (FIXED - SAMA KAYAK OLD) ============
+local function Skill_PressSpace()
+    W.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+    task.wait()
+    W.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+end
+
+local function Skill_GetActionTarget()
+    local current = W.PlayerGui
+    for segment in string.gmatch("Survivor-mob.Controls.action.check", "[^%.]+") do
+        current = current and current:FindFirstChild(segment)
+    end
+    return current
+end
+
+local function Skill_TriggerMobileButton()
+    local b = Skill_GetActionTarget()
+    if b and b:IsA("GuiObject") then
+        local p, s = b.AbsolutePosition, b.AbsoluteSize
+        local i = W.GuiService:GetGuiInset()
+        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
+        pcall(function()
+            W.VirtualInputManager:SendTouchEvent(8822, 0, cx, cy)
+            task.wait(0.01)
+            W.VirtualInputManager:SendTouchEvent(8822, 2, cx, cy)
+        end)
+    end
+end
+
+local function Skill_StartHeartbeat()
+    if W.Connections.SkillHeartbeat then
+        W.Connections.SkillHeartbeat:Disconnect()
+        W.Connections.SkillHeartbeat = nil
+    end
+    W.Connections.SkillHeartbeat = W.RunService.RenderStepped:Connect(function()
+        if not W.Auto.SkillCheck or W.State.busy then return end
+
+        local prompt = W.PlayerGui:FindFirstChild("SkillCheckPromptGui")
+        if not prompt then return end
+
+        local check = prompt:FindFirstChild("Check")
+        if not check or not check.Visible then return end
+
+        local line = check:FindFirstChild("Line")
+        local goal = check:FindFirstChild("Goal")
+        if not line or not goal then return end
+
+        if W.Auto.SkillCheckMode == "Instant" then
+            -- Instant: paksa garis masuk zona Great lalu trigger
+            line.Rotation = goal.Rotation + 109
+
+            W.State.busy = true
+            task.spawn(function()
+                if W.UserInputService.TouchEnabled then
+                    Skill_TriggerMobileButton()
+                else
+                    Skill_PressSpace()
+                end
+                task.wait(0.2)
+                W.State.busy = false
+            end)
+        else
+            -- Legit: cek apakah garis sudah masuk area Great (102° - 116°)
+            local lr = line.Rotation % 360
+            local gr = goal.Rotation % 360
+            local startRange = (gr + 102) % 360
+            local endRange   = (gr + 116) % 360
+
+            local success = (startRange > endRange and (lr >= startRange or lr <= endRange))
+                         or (lr >= startRange and lr <= endRange)
+
+            if success then
+                W.State.busy = true
+                task.spawn(function()
+                    if W.UserInputService.TouchEnabled then
+                        Skill_TriggerMobileButton()
+                    else
+                        Skill_PressSpace()
+                    end
+                    task.wait(0.05)
+                    W.State.busy = false
+                end)
+            end
+        end
+    end)
+end
 
 SurvSkillBox:AddCheckbox("SkillCheck", {
     Text = "Auto Skill Check", Default = false,
     Callback = function(v)
         W.Auto.SkillCheck = v
         if v then
-            if not W.Connections.SkillHeartbeat then
-                W.Connections.SkillHeartbeat = W.RunService.RenderStepped:Connect(function()
-                    if not W.Auto.SkillCheck or W.State.busy then return end
-                    local pg = W.PlayerGui
-                    local pr = pg:FindFirstChild("SkillCheckPromptGui"); if not pr then return end
-                    local ch = pr:FindFirstChild("Check"); if not ch or not ch.Visible then return end
-                    local ln = ch:FindFirstChild("Line"); local gl = ch:FindFirstChild("Goal")
-                    if not ln or not gl then return end
-                    if W.Auto.SkillCheckMode == "Instant" then
-                        ln.Rotation = gl.Rotation + 109
-                        W.State.busy = true
-                        task.spawn(function()
-                            if W.UserInputService.TouchEnabled then
-                                W.VirtualInputManager:SendTouchEvent(8822, 0, 0, 0)
-                            else
-                                W.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                                task.wait()
-                                W.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                            end
-                            task.wait(0.2)
-                            W.State.busy = false
-                        end)
-                    end
-                end)
-            end
+            Skill_StartHeartbeat()
         else
-            if W.Connections.SkillHeartbeat then W.Connections.SkillHeartbeat:Disconnect(); W.Connections.SkillHeartbeat=nil end
+            if W.Connections.SkillHeartbeat then
+                W.Connections.SkillHeartbeat:Disconnect()
+                W.Connections.SkillHeartbeat = nil
+            end
         end
     end,
 })
-SurvSkillBox:AddDropdown("SkillCheckModeDropdown", { Values = {"Legit","Instant"}, Default = 1, Multi = false, Text = "Skill Check Mode", Callback = function(v) W.Auto.SkillCheckMode = v end })
+
+SurvSkillBox:AddDropdown("SkillCheckModeDropdown", {
+    Values = {"Legit","Instant"},
+    Default = 1,
+    Multi = false,
+    Text = "Skill Check Mode",
+    Callback = function(v) W.Auto.SkillCheckMode = v end
+})
+-- ============ END AUTO SKILL CHECK ============
 
 SurvGenBox:AddCheckbox("GenBypassToggle", {
     Text = "Boost Gen Bypass", Default = false,
@@ -3189,7 +3227,63 @@ SurvFakePerksBox:AddCheckbox("FP_AdrenalineRush", {
     Callback = function(v) W.FP_SetupAdrenalineRush(v) end,
 }):AddKeyPicker("FP_AdrenalineRushKey", { Default="None", Text="Toggle Key", Mode="Toggle", Callback=function(s) W.FP_SetupAdrenalineRush(s) end })
 
--- UI SETTINGS
+-- ==================== MISC TAB ====================
+local MiscScriptsBox = Tabs.Misc:AddLeftGroupbox("Extra Scripts", "zap")
+local MiscFunBox = Tabs.Misc:AddRightGroupbox("Fun", "party-popper")
+
+getgenv().MAWWW_FlingLoaded = false
+
+MiscScriptsBox:AddButton({
+    Text = "Load Fling GUI",
+    Func = function()
+        if getgenv().MAWWW_FlingLoaded then
+            VD_Notify("Misc", "Fling GUI udah ke-load!", 2)
+            return
+        end
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/ALFzxzzz-Hub/ALFzxzzz-Hub/refs/heads/main/FLING%20GUI.lua"))()
+        end)
+        if ok then
+            getgenv().MAWWW_FlingLoaded = true
+            VD_Notify("Misc", "Fling GUI Loaded!", 3)
+        else
+            VD_Notify("Misc", "Gagal load: " .. tostring(err), 3)
+        end
+    end,
+    Tooltip = "Load FLING GUI script dari ALF Hub"
+})
+
+MiscScriptsBox:AddDivider()
+MiscScriptsBox:AddLabel("Klik tombol di atas untuk load script eksternal.\nScript akan jalan di executor kamu.")
+
+MiscFunBox:AddButton({
+    Text = "Rejoin Server",
+    Func = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+    end,
+})
+
+MiscFunBox:AddButton({
+    Text = "Server Hop",
+    Func = function()
+        local TS = game:GetService("TeleportService")
+        local HS = game:GetService("HttpService")
+        local ok, res = pcall(function()
+            return HS:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        if ok and res and res.data then
+            for _, srv in ipairs(res.data) do
+                if srv.playing < srv.maxPlayers and srv.id ~= game.JobId then
+                    TS:TeleportToPlaceInstance(game.PlaceId, srv.id, LocalPlayer)
+                    return
+                end
+            end
+        end
+        VD_Notify("Misc", "Gak nemu server lain 😢", 3)
+    end,
+})
+
+-- ==================== UI SETTINGS ====================
 local SettingBox = Tabs.UISettings:AddLeftGroupbox("Menu", "wrench")
 SettingBox:AddToggle("ShowCustomCursor", { Text = "Custom Cursor", Default = true, Callback = function(v) Library.ShowCustomCursor = v end })
 SettingBox:AddDropdown("NotificationSide", { Values = {"Left","Right"}, Default = "Right", Text = "Notification Side", Callback = function(v) Library:SetNotifySide(v) end })
@@ -3210,7 +3304,7 @@ SaveManager:BuildConfigSection(Tabs["UISettings"])
 ThemeManager:ApplyToTab(Tabs["UISettings"])
 SaveManager:LoadAutoloadConfig()
 
--- SETUP PLAYERS
+-- ==================== SETUP PLAYERS ====================
 for _, p in pairs(Players:GetPlayers()) do W.SetupPlayer(p) end
 Players.PlayerAdded:Connect(W.SetupPlayer)
 task.spawn(function()
@@ -3220,11 +3314,12 @@ task.spawn(function()
     end
 end)
 
--- MAIN LOOP
+-- ==================== MAIN LOOP ====================
 RunService.Heartbeat:Connect(function()
     W.HandleAutoPallet()
     W.UpdateNoSlowdown()
     W.MAWWW_AutoHook()
+    W.MAWWW_AutoAttack()
     W.MAWWW_BeatGameKiller()
     local now = tick()
     if VD.KILLER_BlockVaults and now - W.Timers.lastVaultBlock >= 1.5 then
@@ -3233,6 +3328,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- ESP CIRCLE WARNA DINAMIS
 RunService.RenderStepped:Connect(function()
     if W.State.AutoParryAdornment then
         local root = GetRoot()
@@ -3241,6 +3337,13 @@ RunService.RenderStepped:Connect(function()
             W.State.AutoParryAdornment.Radius = cR
             W.State.AutoParryAdornment.InnerRadius = math.max(0.1, cR-0.15)
             W.State.AutoParryAdornment.CFrame = CFrame.new(0,-3,0) * CFrame.Angles(math.rad(90),0,0)
+            if W.State.ParryCooldown then 
+                W.State.AutoParryAdornment.Color3 = Color3.fromRGB(255, 128, 0)
+            elseif Config.Surv_ParryAggressive then 
+                W.State.AutoParryAdornment.Color3 = Color3.fromRGB(255, 0, 0)
+            else 
+                W.State.AutoParryAdornment.Color3 = Color3.fromRGB(0, 255, 255)
+            end
         else
             W.State.AutoParryAdornment:Destroy()
             W.State.AutoParryAdornment = nil
@@ -3256,6 +3359,7 @@ RunService.RenderStepped:Connect(function()
             W.State.AutoParryAdornment.Parent = root
             W.State.AutoParryAdornment.ZIndex = 0
             W.State.AutoParryAdornment.AlwaysOnTop = false
+            W.State.AutoParryAdornment.Color3 = Color3.fromRGB(0, 255, 255)
         end
     end
 end)
@@ -3266,6 +3370,5 @@ LocalPlayer.CharacterAdded:Connect(function()
     if VD.SURV_JumpPowerEnabled then W.applyJumpPower() end
 end)
 
-Library:Notify({ Title = "Wisnu Hub", Description = "All Features Loaded!", Time = 3 })
-print("[Wisnu Hub] File 4/4 loaded ✓ — All systems GO!")
--- PART 4 END
+Library:Notify({ Title = "Wisnu Hub", Description = "All Features Loaded! (Auto Skill Check FIXED)", Time = 3 })
+print("[Wisnu Hub] MERGED + MISC + AUTO ATTACK loaded ✓ — Auto Skill Check FIXED!")
