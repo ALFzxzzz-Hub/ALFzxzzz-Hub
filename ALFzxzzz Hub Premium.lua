@@ -25,7 +25,7 @@ VD.VeilShowFOV          = VD.VeilShowFOV ~= false
 VD.VeilShowTracker      = VD.VeilShowTracker or false
 VD.VeilAutoPredict      = VD.VeilAutoPredict ~= false
 VD.VeilFOV              = VD.VeilFOV or 150
-VD.VeilMaxDist          = VD.VeilMaxDist or 300
+VD.VeilMaxDist          = VD.VeilMaxDist or 280
 VD.VeilSpearSpeed       = VD.VeilSpearSpeed or 165
 VD.VeilGravity          = VD.VeilGravity or 103
 VD.VeilAuraSpearSpeed   = VD.VeilAuraSpearSpeed or 165
@@ -6378,7 +6378,7 @@ end
         if not hrp then return end
         local nearest, nearestPart = nil, nil
         local bestDist = VD.VeilFOV or 150
-        local bestStudDist = VD.VeilMaxDist or 500
+        local bestStudDist = VD.VeilMaxDist or 280
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and Veil_IsSurvivorVeil(p) and p.Character then
                 local pc = p.Character
@@ -7846,7 +7846,7 @@ crosshairSection:AddSlider({
         VeilSection:AddToggle({ Title = "Show Target Tracker", Default = VD.VeilShowTracker, Callback = function(v) VD.VeilShowTracker = v end })
         VeilSection:AddToggle({ Title = "Auto Predict", Default = VD.VeilAutoPredict, Callback = function(v) VD.VeilAutoPredict = v end })
         VeilSection:AddSlider({ Title = "FOV Size", Min = 50, Max = 500, Default = VD.VeilFOV, Increment = 10, Callback = function(v) VD.VeilFOV = v end })
-        VeilSection:AddSlider({ Title = "Max Distance", Min = 50, Max = 300, Default = VD.VeilMaxDist, Increment = 10, Callback = function(v) VD.VeilMaxDist = v end })
+        VeilSection:AddSlider({ Title = "Max Distance", Min = 50, Max = 280, Default = VD.VeilMaxDist, Increment = 10, Callback = function(v) VD.VeilMaxDist = v end })
         VeilSection:AddSlider({ Title = "Spear Speed", Min = 50, Max = 400, Default = VD.VeilSpearSpeed, Increment = 5, Callback = function(v) VD.VeilSpearSpeed = v end })
         VeilSection:AddSlider({ Title = "Spear Gravity", Min = 10, Max = 300, Default = VD.VeilGravity, Increment = 1, Callback = function(v) VD.VeilGravity = v end })
         VeilSection:AddSlider({ Title = "Aura Spear Speed", Min = 50, Max = 400, Default = VD.VeilAuraSpearSpeed, Increment = 5, Callback = function(v) VD.VeilAuraSpearSpeed = v end })
